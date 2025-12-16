@@ -1,7 +1,6 @@
-import { PrismaClient } from '@prisma/client';
+import 'dotenv/config';
+import { prisma } from '../lib/prisma';
 import bcrypt from 'bcryptjs';
-
-const prisma = new PrismaClient();
 
 async function main() {
   console.log('🌱 Starting database seed...');
@@ -9,123 +8,175 @@ async function main() {
   const demoUserEmail = 'demo@example.com';
   const demoPassword = await bcrypt.hash('password123', 10);
 
-  const existingUser = await prisma.user.findUnique({
+  let user = await prisma.user.findUnique({
     where: { email: demoUserEmail },
   });
 
-  if (existingUser) {
-    console.log('Demo user already exists, skipping...');
-    return;
+  if (!user) {
+    user = await prisma.user.create({
+      data: {
+        email: demoUserEmail,
+        password: demoPassword,
+        name: 'Demo User',
+      },
+    });
+    console.log(`✅ Created demo user: ${user.email}`);
+  } else {
+    console.log('Demo user already exists');
   }
 
-  const user = await prisma.user.create({
-    data: {
-      email: demoUserEmail,
-      password: demoPassword,
-      name: 'Demo User',
-    },
+  // Create Billing Plan
+  let billingPlan = await prisma.billingPlan.findFirst({ where: { name: 'Free' } });
+  if (!billingPlan) {
+    billingPlan = await prisma.billingPlan.create({
+      data: {
+        name: 'Free',
+        price: 0,
+        features: {
+          maxWorkflows: 5,
+          maxExecutions: 100,
+        },
+      },
+    });
+    console.log('✅ Created billing plan: Free');
+  }
+
+  // Create Workspace
+  let workspace = await prisma.workspace.findUnique({
+    where: { slug: 'demo-workspace' },
   });
 
-  console.log(`✅ Created demo user: ${user.email}`);
-
-  const workflow = await prisma.workflow.create({
-    data: {
-      name: 'Example Workflow',
-      description: 'A sample workflow to demonstrate the system',
-      userId: user.id,
-      isPublic: false,
-    },
-  });
-
-  console.log(`✅ Created demo workflow: ${workflow.name}`);
-
-  const workflowVersion = await prisma.workflowVersion.create({
-    data: {
-      workflowId: workflow.id,
-      version: 1,
-      isActive: true,
-      definition: {
-        nodes: [
-          {
-            id: 'start',
-            type: 'trigger',
-            data: { label: 'Start' },
+  if (!workspace) {
+    workspace = await prisma.workspace.create({
+      data: {
+        name: "Demo's Workspace",
+        slug: 'demo-workspace',
+        billingPlanId: billingPlan.id,
+        members: {
+          create: {
+            userId: user.id,
+            role: 'owner',
           },
-          {
-            id: 'process',
-            type: 'action',
-            data: { label: 'Process Data' },
+        },
+        apiKeys: {
+          create: {
+            key: 'sk_test_demo_key_123456789',
+            name: 'Demo Key',
           },
-          {
-            id: 'end',
-            type: 'result',
-            data: { label: 'End' },
-          },
-        ],
-        edges: [
-          { source: 'start', target: 'process' },
-          { source: 'process', target: 'end' },
-        ],
+        },
       },
-    },
-  });
+    });
+    console.log(`✅ Created workspace: ${workspace.name}`);
+  } else {
+    console.log('Demo workspace already exists');
+  }
 
-  console.log(`✅ Created workflow version: v${workflowVersion.version}`);
-
-  const execution = await prisma.execution.create({
-    data: {
-      workflowVersionId: workflowVersion.id,
-      status: 'completed',
-      input: { message: 'Hello World' },
-      output: { result: 'Success', processedAt: new Date().toISOString() },
-      completedAt: new Date(),
-    },
-  });
-
-  console.log(`✅ Created demo execution: ${execution.id}`);
-
-  await prisma.executionLog.createMany({
-    data: [
-      {
-        executionId: execution.id,
-        level: 'info',
-        message: 'Execution started',
+  // Workflows
+  const workflowCount = await prisma.workflow.count({ where: { userId: user.id } });
+  
+  if (workflowCount === 0) {
+    const workflow = await prisma.workflow.create({
+      data: {
+        name: 'Example Workflow',
+        description: 'A sample workflow to demonstrate the system',
+        userId: user.id,
+        isPublic: false,
       },
-      {
-        executionId: execution.id,
-        level: 'info',
-        message: 'Processing node: start',
-      },
-      {
-        executionId: execution.id,
-        level: 'info',
-        message: 'Processing node: process',
-      },
-      {
-        executionId: execution.id,
-        level: 'info',
-        message: 'Processing node: end',
-      },
-      {
-        executionId: execution.id,
-        level: 'info',
-        message: 'Execution completed successfully',
-      },
-    ],
-  });
+    });
 
-  console.log('✅ Created execution logs');
+    console.log(`✅ Created demo workflow: ${workflow.name}`);
 
-  await prisma.subscription.create({
-    data: {
-      userId: user.id,
-      status: 'active',
-      currentPeriodStart: new Date(),
-      currentPeriodEnd: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
-    },
-  });
+    const workflowVersion = await prisma.workflowVersion.create({
+      data: {
+        workflowId: workflow.id,
+        version: 1,
+        isActive: true,
+        definition: {
+          nodes: [
+            {
+              id: 'start',
+              type: 'trigger',
+              data: { label: 'Start' },
+            },
+            {
+              id: 'process',
+              type: 'action',
+              data: { label: 'Process Data' },
+            },
+            {
+              id: 'end',
+              type: 'result',
+              data: { label: 'End' },
+            },
+          ],
+          edges: [
+            { source: 'start', target: 'process' },
+            { source: 'process', target: 'end' },
+          ],
+        },
+      },
+    });
 
-  console.log('✅ Created demo subscription');
+    console.log(`✅ Created workflow version: v${workflowVersion.version}`);
+
+    const execution = await prisma.execution.create({
+      data: {
+        workflowVersionId: workflowVersion.id,
+        status: 'completed',
+        input: { message: 'Hello World' },
+        output: { result: 'Success', processedAt: new Date().toISOString() },
+        completedAt: new Date(),
+      },
+    });
+
+    console.log(`✅ Created demo execution: ${execution.id}`);
+
+    await prisma.executionLog.createMany({
+      data: [
+        {
+          executionId: execution.id,
+          level: 'info',
+          message: 'Execution started',
+        },
+        {
+          executionId: execution.id,
+          level: 'info',
+          message: 'Processing node: start',
+        },
+        {
+          executionId: execution.id,
+          level: 'info',
+          message: 'Processing node: process',
+        },
+        {
+          executionId: execution.id,
+          level: 'info',
+          message: 'Processing node: end',
+        },
+        {
+          executionId: execution.id,
+          level: 'info',
+          message: 'Execution completed successfully',
+        },
+      ],
+    });
+
+    console.log('✅ Created execution logs');
+  }
+
+  // Subscription
+  const subscription = await prisma.subscription.findFirst({ where: { userId: user.id } });
+  if (!subscription) {
+    await prisma.subscription.create({
+      data: {
+        userId: user.id,
+        status: 'active',
+        currentPeriodStart: new Date(),
+        currentPeriodEnd: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+      },
+    });
+    console.log('✅ Created demo subscription');
+  }
 
   console.log('\n🎉 Seed completed successfully!');
   console.log('\nDemo credentials:');
