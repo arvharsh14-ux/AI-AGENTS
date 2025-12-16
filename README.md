@@ -1,14 +1,16 @@
 # AI-AGENTS
 
-Next.js 14 (App Router) + TypeScript + Tailwind CSS + Prisma + NextAuth.js scaffold.
+Next.js 14 (App Router) + TypeScript + Tailwind CSS + Prisma + NextAuth.js + Bull/Redis SaaS scaffold.
 
 ## Features
 
 - 🔐 **Authentication** - NextAuth.js with email/password + OAuth
 - 🗄️ **Database** - PostgreSQL with Prisma ORM
+- ⚡ **Queues** - Bull + Redis for background jobs
 - 🎨 **Styling** - Tailwind CSS with UI components
 - 🔒 **Protected Routes** - Server-side authentication guards
 - 📊 **Type Safety** - Full TypeScript support
+- 🏢 **Multi-tenancy** - Workspace-based architecture
 - 🌱 **Seeding** - Demo data for development
 
 ## Getting started
@@ -21,17 +23,23 @@ pnpm install
 
 ### 2. Set up environment
 
-Copy `.env.example` to `.env.local`:
+Copy `.env.example` to `.env`:
 
 ```bash
-cp .env.example .env.local
+cp .env.example .env
 ```
 
-Edit `.env.local` and set:
-- `DATABASE_URL` - Your PostgreSQL connection string
-- `NEXTAUTH_SECRET` - Generate with `openssl rand -base64 32`
+Edit `.env` and set `DATABASE_URL`, `REDIS_URL` and `NEXTAUTH_SECRET`.
 
-### 3. Set up database
+### 3. Start Infrastructure
+
+Use Docker Compose to start PostgreSQL, Redis, and Maildev:
+
+```bash
+docker compose up -d
+```
+
+### 4. Set up database
 
 ```bash
 # Generate Prisma Client
@@ -44,18 +52,30 @@ pnpm db:migrate
 pnpm db:seed
 ```
 
-### 4. Start development server
+### 5. Start development server
+
+You need to start both the Next.js app and the background workers:
 
 ```bash
+# Terminal 1: Next.js App
 pnpm dev
+
+# Terminal 2: Background Workers
+pnpm workers
 ```
+
+## Infrastructure
+
+- **PostgreSQL**: Primary database (port 5432)
+- **Redis**: Queue backend (port 6379)
+- **Maildev**: Local email testing (port 1080 for UI, 1025 for SMTP)
 
 ## Application Routes
 
 - **Landing page**: http://localhost:3000
 - **Sign In**: http://localhost:3000/auth/signin
-- **Sign Up**: http://localhost:3000/auth/signup
 - **Dashboard** (protected): http://localhost:3000/dashboard
+- **Workflows**: http://localhost:3000/workflows
 
 ## Demo Credentials
 
@@ -63,21 +83,12 @@ After seeding:
 - **Email**: `demo@example.com`
 - **Password**: `password123`
 
-## Documentation
+## CI/CD
 
-- [Authentication Setup Guide](./docs/AUTH_SETUP.md) - Complete authentication documentation
-
-## Available Scripts
+Run the following scripts to verify the codebase:
 
 ```bash
-pnpm dev          # Start development server
-pnpm build        # Build for production
-pnpm start        # Start production server
-pnpm lint         # Run ESLint
-pnpm typecheck    # Run TypeScript checks
-pnpm format       # Format code with Prettier
-pnpm db:generate  # Generate Prisma Client
-pnpm db:migrate   # Run database migrations
-pnpm db:seed      # Seed database with demo data
-pnpm db:studio    # Open Prisma Studio
+pnpm ci           # Run lint, typecheck, test, and build
+pnpm test         # Run unit tests
+pnpm lint         # Run linter
 ```
