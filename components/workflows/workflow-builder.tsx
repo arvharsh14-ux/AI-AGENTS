@@ -2,221 +2,159 @@
 
 import { useState, useCallback, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Select } from '@/components/ui/select';
-import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Dialog, DialogTrigger, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
+import { StepLibrary } from './step-library';
+import { WorkflowCanvas } from './workflow-canvas';
 import { StepEditor } from './step-editor';
+import { TestPanel } from './test-panel';
 import type { Workflow, WorkflowVersion } from '@prisma/client';
-import type { WorkflowDefinition } from '@/lib/types/workflow.types';
+import type { WorkflowDefinition, StepDefinition } from '@/lib/types/workflow.types';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 interface WorkflowBuilderProps {
   workflow: Workflow;
   version: WorkflowVersion;
 }
 
-interface Step {
-  id: string;
-  name: string;
-  type: 'http_request' | 'transform' | 'conditional' | 'loop' | 'delay' | 'error_handler' | 'fallback' | 'custom_code';
-  config: Record<string, any>;
-  position: number;
-}
-
 export function WorkflowBuilder({ workflow, version }: WorkflowBuilderProps) {
-  const [steps, setSteps] = useState<Step[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [steps, setSteps] = useState<StepDefinition[]>([]);
+  const [selectedStepId, setSelectedStepId] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
-  const [editingStep, setEditingStep] = useState<Step | null>(null);
-  const [showStepEditor, setShowStepEditor] = useState(false);
+  const [activeTab, setActiveTab] = useState('design');
 
   useEffect(() => {
     const definition = version.definition as unknown as WorkflowDefinition;
     if (definition.steps) {
-      setSteps(definition.steps as unknown as Step[]);
+      // Ensure steps have layout if missing
+      const stepsWithLayout = definition.steps.map((step, index) => ({
+        ...step,
+        layout: step.layout || { x: 100 + (index * 50), y: 100 + (index * 80) }
+      }));
+      setSteps(stepsWithLayout);
     }
   }, [version]);
 
-  const handleAddStep = useCallback(() => {
-    const newStep: Step = {
-      id: `step-${Date.now()}`,
-      name: '',
-      type: 'http_request',
-      config: {},
-      position: steps.length,
-    };
-    setEditingStep(newStep);
-    setShowStepEditor(true);
-  }, [steps]);
+  const handleSaveWorkflow = async (publish = false) => {
+    setIsSaving(true);
+    try {
+      const definition: WorkflowDefinition = {
+        steps,
+      };
 
-  const handleEditStep = useCallback((step: Step) => {
-    setEditingStep(step);
-    setShowStepEditor(true);
-  }, []);
+      const response = await fetch(`/api/workflows/${workflow.id}/versions`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ definition, publish }),
+      });
 
-  const handleSaveStep = useCallback((updatedStep: Step) => {
-    if (editingStep?.id === updatedStep.id) {
-      setSteps(steps.map((s) => (s.id === updatedStep.id ? updatedStep : s)));
-    } else {
-      setSteps([...steps, updatedStep]);
+      if (!response.ok) {
+        throw new Error('Failed to save workflow');
+      }
+      
+      return await response.json(); // Return new version info
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setIsSaving(false);
     }
-    setEditingStep(null);
-    setShowStepEditor(false);
-  }, [steps, editingStep]);
+  };
 
-  const handleDeleteStep = useCallback((id: string) => {
+  const handleUpdateStep = (updatedStep: any) => {
+    setSteps(steps.map((s) => (s.id === updatedStep.id ? updatedStep : s)));
+  };
+
+  const handleDeleteStep = (id: string) => {
     setSteps(steps.filter((s) => s.id !== id));
-  }, [steps]);
-
-  const handleSaveWorkflow = async () => {
-    setIsSaving(true);
-    setError(null);
-
-    try {
-      const definition: WorkflowDefinition = {
-        steps,
-      };
-
-      const response = await fetch(`/api/workflows/${workflow.id}/versions`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ definition }),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to save workflow');
-      }
-
-      // Optionally publish the version
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'An error occurred');
-    } finally {
-      setIsSaving(false);
-    }
+    if (selectedStepId === id) setSelectedStepId(null);
   };
 
-  const handlePublish = async () => {
-    setIsSaving(true);
-    setError(null);
+  const handleRunTest = async (input: any) => {
+    // 1. Save current draft as new version
+    const savedVersion = await handleSaveWorkflow(false);
+    
+    if (!savedVersion) return null;
 
-    try {
-      const definition: WorkflowDefinition = {
-        steps,
-      };
+    // 2. Trigger execution with versionId
+    const response = await fetch(`/api/workflows/${workflow.id}/execute`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        input,
+        versionId: savedVersion.id
+      }),
+    });
 
-      const response = await fetch(`/api/workflows/${workflow.id}/versions`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ definition, publish: true }),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to publish workflow');
-      }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'An error occurred');
-    } finally {
-      setIsSaving(false);
+    if (response.ok) {
+      const data = await response.json();
+      return data.jobId;
     }
+    return null;
   };
+
+  const selectedStepIndex = steps.findIndex(s => s.id === selectedStepId);
+  const selectedStep = selectedStepIndex >= 0 ? steps[selectedStepIndex] : null;
+  const previousSteps = selectedStepIndex >= 0 ? steps.slice(0, selectedStepIndex) : [];
 
   return (
-    <div className="space-y-6">
-      {error && (
-        <div className="rounded-md bg-red-50 p-4 text-sm text-red-700">
-          {error}
+    <div className="flex flex-col h-[calc(100vh-140px)]">
+      <div className="flex justify-between items-center mb-4">
+        <div className="flex gap-2">
+          <Button variant={activeTab === 'design' ? 'default' : 'outline'} onClick={() => setActiveTab('design')} size="sm">
+            Designer
+          </Button>
+          <Button variant={activeTab === 'test' ? 'default' : 'outline'} onClick={() => setActiveTab('test')} size="sm">
+            Test
+          </Button>
         </div>
-      )}
-
-      <div className="rounded-lg border bg-slate-50 p-6">
-        <h3 className="mb-4 text-lg font-semibold">Workflow Steps</h3>
-
-        {steps.length === 0 ? (
-          <div className="rounded-lg border border-dashed bg-white p-8 text-center">
-            <p className="mb-4 text-slate-600">No steps yet. Add your first step to get started.</p>
-            <Button onClick={handleAddStep}>Add Step</Button>
-          </div>
-        ) : (
-          <div className="space-y-3">
-            {steps.map((step, index) => (
-              <div
-                key={step.id}
-                className="flex items-center justify-between rounded-lg border bg-white p-4"
-              >
-                <div className="flex items-center gap-4">
-                  <div className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-200 text-sm font-semibold">
-                    {index + 1}
-                  </div>
-                  <div>
-                    <p className="font-medium">{step.name || '(Unnamed step)'}</p>
-                    <p className="text-sm text-slate-600">{step.type}</p>
-                  </div>
-                </div>
-
-                <div className="flex gap-2">
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    onClick={() => handleEditStep(step)}
-                  >
-                    Edit
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => handleDeleteStep(step.id)}
-                  >
-                    Delete
-                  </Button>
-                </div>
-              </div>
-            ))}
-
-            <Button
-              variant="secondary"
-              onClick={handleAddStep}
-              className="w-full"
-            >
-              Add Step
-            </Button>
-          </div>
-        )}
+        <div className="flex gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => handleSaveWorkflow(false)}
+            disabled={isSaving}
+          >
+            Save Draft
+          </Button>
+          <Button
+            size="sm"
+            onClick={() => handleSaveWorkflow(true)}
+            disabled={isSaving}
+          >
+            Publish
+          </Button>
+        </div>
       </div>
 
-      {showStepEditor && editingStep && (
-        <StepEditor
-          step={editingStep}
-          onSave={handleSaveStep}
-          onCancel={() => {
-            setShowStepEditor(false);
-            setEditingStep(null);
-          }}
-        />
-      )}
+      <div className="flex flex-1 border rounded-lg overflow-hidden bg-white">
+        {/* Sidebar Library */}
+        <StepLibrary />
 
-      <div className="flex gap-4">
-        <Button
-          disabled={isSaving || steps.length === 0}
-          onClick={handleSaveWorkflow}
-        >
-          {isSaving ? 'Saving...' : 'Save Draft'}
-        </Button>
-        <Button
-          variant="secondary"
-          disabled={isSaving || steps.length === 0}
-          onClick={handlePublish}
-        >
-          {isSaving ? 'Publishing...' : 'Publish'}
-        </Button>
+        {/* Canvas Area */}
+        <WorkflowCanvas
+          steps={steps}
+          onStepsChange={setSteps}
+          selectedStepId={selectedStepId}
+          onSelectStep={setSelectedStepId}
+        />
+
+        {/* Right Panel: Inspector or Test */}
+        <div className="w-80 border-l bg-slate-50 overflow-y-auto">
+          {activeTab === 'test' ? (
+            <TestPanel workflowId={workflow.id} onRunTest={handleRunTest} />
+          ) : (
+            selectedStep ? (
+              <StepEditor
+                step={selectedStep}
+                previousSteps={previousSteps}
+                onSave={handleUpdateStep}
+                onCancel={() => setSelectedStepId(null)}
+              />
+            ) : (
+              <div className="p-8 text-center text-slate-500 text-sm">
+                Select a step to configure it
+              </div>
+            )
+          )}
+        </div>
       </div>
     </div>
   );

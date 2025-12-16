@@ -6,19 +6,21 @@ import { workflowExecutor } from './executor';
 
 export function startDispatchWorker() {
   dispatchQueue.process(async (job: Job<DispatchJobData>) => {
-    const { workflowId, triggerId, input, metadata } = job.data;
+    const { workflowId, versionId, triggerId, input, metadata } = job.data;
 
-    console.log(`[Dispatcher] Processing workflow ${workflowId}`);
+    console.log(`[Dispatcher] Processing workflow ${workflowId} (version: ${versionId || 'active'})`);
 
     try {
-      const activeVersion = await workflowService.getActiveVersion(workflowId);
+      const version = versionId 
+        ? await workflowService.getVersion(versionId)
+        : await workflowService.getActiveVersion(workflowId);
 
-      if (!activeVersion) {
-        throw new Error(`No active version found for workflow ${workflowId}`);
+      if (!version) {
+        throw new Error(`No ${versionId ? 'specified' : 'active'} version found for workflow ${workflowId}`);
       }
 
       const execution = await executionService.createExecution({
-        workflowVersionId: activeVersion.id,
+        workflowVersionId: version.id,
         triggerId,
         input: input || {},
       });
@@ -27,7 +29,7 @@ export function startDispatchWorker() {
 
       await executionQueue.add({
         executionId: execution.id,
-        workflowVersionId: activeVersion.id,
+        workflowVersionId: version.id,
         input: input || {},
       });
 
