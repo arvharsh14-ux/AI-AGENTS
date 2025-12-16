@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { WorkflowForm } from '@/components/workflows/workflow-form';
 
 export default async function CreateWorkflowPage() {
-  const session = await requireAuth();
+  await requireAuth();
 
   return (
     <div className="max-w-2xl">
@@ -19,7 +19,7 @@ export default async function CreateWorkflowPage() {
           <CardTitle>Workflow Details</CardTitle>
         </CardHeader>
         <CardContent>
-          <WorkflowForm userId={session.user.id} />
+          <WorkflowForm />
         </CardContent>
       </Card>
     </div>

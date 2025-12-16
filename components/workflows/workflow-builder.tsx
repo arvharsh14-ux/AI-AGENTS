@@ -2,19 +2,25 @@
 
 import { useState, useCallback, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Select } from '@/components/ui/select';
-import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Dialog, DialogTrigger, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { StepEditor } from './step-editor';
+import {
+  ConnectorsManager,
+  type WorkflowConnector,
+} from './connectors-manager';
 import type { Workflow, WorkflowVersion } from '@prisma/client';
 import type { WorkflowDefinition } from '@/lib/types/workflow.types';
 
 interface WorkflowBuilderProps {
   workflow: Workflow;
   version: WorkflowVersion;
+  plan: {
+    tier: 'free' | 'pro';
+    limits: {
+      maxWorkflows: number;
+      maxStepsPerWorkflow: number;
+      maxConnectorsPerWorkflow: number;
+    };
+  };
 }
 
 interface Step {
@@ -25,9 +31,9 @@ interface Step {
   position: number;
 }
 
-export function WorkflowBuilder({ workflow, version }: WorkflowBuilderProps) {
+export function WorkflowBuilder({ workflow, version, plan }: WorkflowBuilderProps) {
   const [steps, setSteps] = useState<Step[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
+  const [connectors, setConnectors] = useState<WorkflowConnector[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [editingStep, setEditingStep] = useState<Step | null>(null);
@@ -40,7 +46,18 @@ export function WorkflowBuilder({ workflow, version }: WorkflowBuilderProps) {
     }
   }, [version]);
 
+  const maxSteps = plan.limits.maxStepsPerWorkflow;
+  const hasStepLimit = Number.isFinite(maxSteps);
+  const stepLimitReached = hasStepLimit && steps.length >= maxSteps;
+
   const handleAddStep = useCallback(() => {
+    if (stepLimitReached) {
+      setError(
+        `Free plan limit reached: max ${maxSteps} steps per workflow. Upgrade to Pro to add more.`
+      );
+      return;
+    }
+
     const newStep: Step = {
       id: `step-${Date.now()}`,
       name: '',
@@ -50,7 +67,7 @@ export function WorkflowBuilder({ workflow, version }: WorkflowBuilderProps) {
     };
     setEditingStep(newStep);
     setShowStepEditor(true);
-  }, [steps]);
+  }, [maxSteps, stepLimitReached, steps]);
 
   const handleEditStep = useCallback((step: Step) => {
     setEditingStep(step);
@@ -58,18 +75,26 @@ export function WorkflowBuilder({ workflow, version }: WorkflowBuilderProps) {
   }, []);
 
   const handleSaveStep = useCallback((updatedStep: Step) => {
-    if (editingStep?.id === updatedStep.id) {
-      setSteps(steps.map((s) => (s.id === updatedStep.id ? updatedStep : s)));
-    } else {
-      setSteps([...steps, updatedStep]);
-    }
+    setSteps((prev) => {
+      const exists = prev.some((s) => s.id === updatedStep.id);
+      const next = exists
+        ? prev.map((s) => (s.id === updatedStep.id ? updatedStep : s))
+        : [...prev, updatedStep];
+
+      return next.map((s, idx) => ({ ...s, position: idx }));
+    });
+
     setEditingStep(null);
     setShowStepEditor(false);
-  }, [steps, editingStep]);
+  }, []);
 
   const handleDeleteStep = useCallback((id: string) => {
-    setSteps(steps.filter((s) => s.id !== id));
-  }, [steps]);
+    setSteps((prev) =>
+      prev
+        .filter((s) => s.id !== id)
+        .map((s, idx) => ({ ...s, position: idx }))
+    );
+  }, []);
 
   const handleSaveWorkflow = async () => {
     setIsSaving(true);
@@ -138,12 +163,28 @@ export function WorkflowBuilder({ workflow, version }: WorkflowBuilderProps) {
       )}
 
       <div className="rounded-lg border bg-slate-50 p-6">
+        <h3 className="mb-4 text-lg font-semibold">Connectors</h3>
+        <ConnectorsManager
+          workflowId={workflow.id}
+          maxConnectors={plan.limits.maxConnectorsPerWorkflow}
+          onConnectorsChange={setConnectors}
+        />
+      </div>
+
+      <div className="rounded-lg border bg-slate-50 p-6">
         <h3 className="mb-4 text-lg font-semibold">Workflow Steps</h3>
 
         {steps.length === 0 ? (
           <div className="rounded-lg border border-dashed bg-white p-8 text-center">
             <p className="mb-4 text-slate-600">No steps yet. Add your first step to get started.</p>
-            <Button onClick={handleAddStep}>Add Step</Button>
+            <Button onClick={handleAddStep} disabled={stepLimitReached}>
+              Add Step
+            </Button>
+            {stepLimitReached && (
+              <p className="mt-3 text-sm text-slate-600">
+                Step limit reached for your plan. <a className="underline" href="/settings/billing">Upgrade</a>
+              </p>
+            )}
           </div>
         ) : (
           <div className="space-y-3">
@@ -185,9 +226,15 @@ export function WorkflowBuilder({ workflow, version }: WorkflowBuilderProps) {
               variant="secondary"
               onClick={handleAddStep}
               className="w-full"
+              disabled={stepLimitReached}
             >
               Add Step
             </Button>
+            {stepLimitReached && (
+              <p className="text-sm text-slate-600">
+                Step limit reached. <a className="underline" href="/settings/billing">Upgrade</a>
+              </p>
+            )}
           </div>
         )}
       </div>
@@ -195,6 +242,7 @@ export function WorkflowBuilder({ workflow, version }: WorkflowBuilderProps) {
       {showStepEditor && editingStep && (
         <StepEditor
           step={editingStep}
+          connectors={connectors}
           onSave={handleSaveStep}
           onCancel={() => {
             setShowStepEditor(false);

@@ -7,6 +7,7 @@ import { Select } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import type { WorkflowConnector } from './connectors-manager';
 
 interface Step {
   id: string;
@@ -18,6 +19,7 @@ interface Step {
 
 interface StepEditorProps {
   step: Step;
+  connectors: WorkflowConnector[];
   onSave: (step: Step) => void;
   onCancel: () => void;
 }
@@ -31,7 +33,12 @@ const STEP_TYPES = [
   { value: 'custom_code', label: 'Custom Code' },
 ];
 
-export function StepEditor({ step: initialStep, onSave, onCancel }: StepEditorProps) {
+export function StepEditor({
+  step: initialStep,
+  connectors,
+  onSave,
+  onCancel,
+}: StepEditorProps) {
   const [step, setStep] = useState<Step>(initialStep);
 
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
@@ -87,12 +94,50 @@ export function StepEditor({ step: initialStep, onSave, onCancel }: StepEditorPr
           {step.type === 'http_request' && (
             <>
               <div className="space-y-2">
+                <Label htmlFor="connector">Connector (optional)</Label>
+                <Select
+                  id="connector"
+                  value={step.config.connectorInstanceId || ''}
+                  onChange={(e) =>
+                    handleConfigChange(
+                      'connectorInstanceId',
+                      e.target.value || undefined
+                    )
+                  }
+                >
+                  <option value="">None</option>
+                  {connectors.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.name}
+                    </option>
+                  ))}
+                </Select>
+                <p className="text-xs text-slate-500">
+                  Connectors store base URLs and auth. Select one to
+                  automatically add auth headers.
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="path">Path (optional)</Label>
+                <Input
+                  id="path"
+                  value={step.config.path || ''}
+                  onChange={(e) => handleConfigChange('path', e.target.value)}
+                  placeholder="/v1/resource"
+                />
+                <p className="text-xs text-slate-500">
+                  If set, this will be joined with the connector base URL.
+                </p>
+              </div>
+
+              <div className="space-y-2">
                 <Label htmlFor="url">URL</Label>
                 <Input
                   id="url"
                   value={step.config.url || ''}
                   onChange={(e) => handleConfigChange('url', e.target.value)}
-                  placeholder="https://api.example.com/endpoint"
+                  placeholder="https://api.example.com/endpoint or /endpoint"
                 />
               </div>
 
@@ -115,7 +160,11 @@ export function StepEditor({ step: initialStep, onSave, onCancel }: StepEditorPr
                 <Label htmlFor="headers">Headers (JSON)</Label>
                 <Textarea
                   id="headers"
-                  value={step.config.headers ? JSON.stringify(step.config.headers, null, 2) : ''}
+                  value={
+                    step.config.headers
+                      ? JSON.stringify(step.config.headers, null, 2)
+                      : ''
+                  }
                   onChange={(e) => {
                     try {
                       const headers = JSON.parse(e.target.value);
@@ -124,7 +173,7 @@ export function StepEditor({ step: initialStep, onSave, onCancel }: StepEditorPr
                       // Invalid JSON, don't update
                     }
                   }}
-                  placeholder='{"Authorization": "Bearer token"}'
+                  placeholder='{"Content-Type": "application/json"}'
                 />
               </div>
 
@@ -143,6 +192,47 @@ export function StepEditor({ step: initialStep, onSave, onCancel }: StepEditorPr
                   }}
                   placeholder='{"key": "value"}'
                 />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="responsePath">Response path (optional)</Label>
+                <Input
+                  id="responsePath"
+                  value={step.config.responsePath || ''}
+                  onChange={(e) =>
+                    handleConfigChange('responsePath', e.target.value)
+                  }
+                  placeholder="data.id"
+                />
+                <p className="text-xs text-slate-500">
+                  Sets <code>output.mapped</code> to a value from the response.
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="responseMapping">
+                  Response mapping (JSON template)
+                </Label>
+                <Textarea
+                  id="responseMapping"
+                  value={
+                    step.config.responseMapping
+                      ? JSON.stringify(step.config.responseMapping, null, 2)
+                      : ''
+                  }
+                  onChange={(e) => {
+                    try {
+                      const mapping = JSON.parse(e.target.value);
+                      handleConfigChange('responseMapping', mapping);
+                    } catch {
+                      // Invalid JSON, don't update
+                    }
+                  }}
+                  placeholder='{"id": "{{response.data.id}}"}'
+                />
+                <p className="text-xs text-slate-500">
+                  Use <code>{'{{response.data}}'}</code> and workflow variables.
+                </p>
               </div>
             </>
           )}
