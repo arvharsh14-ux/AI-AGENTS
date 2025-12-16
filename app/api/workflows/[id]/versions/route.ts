@@ -25,7 +25,7 @@ export async function POST(
     }
 
     const body = await request.json();
-    const { definition } = body;
+    const { definition, publish } = body;
 
     if (!definition) {
       return NextResponse.json(
@@ -34,7 +34,14 @@ export async function POST(
       );
     }
 
-    const version = await workflowService.createVersion(params.id, definition);
+    let version = await workflowService.createVersion(params.id, definition);
+
+    if (publish && version) {
+      const publishedVersion = await workflowService.publishVersion(version.id);
+      if (publishedVersion) {
+        version = publishedVersion;
+      }
+    }
 
     return NextResponse.json({ version }, { status: 201 });
   } catch (error: any) {

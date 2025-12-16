@@ -7,34 +7,54 @@ export default async function ProtectedLayout({
   const session = await requireAuth();
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between rounded-lg border bg-white px-4 py-3">
-        <div className="text-sm font-medium">
-          Welcome, {session.user.name || session.user.email}
+    <div className="flex h-screen flex-col bg-slate-50">
+      <header className="border-b bg-white px-6 py-4">
+        <div className="flex items-center justify-between">
+          <h1 className="text-xl font-semibold text-slate-900">Workflow Builder</h1>
+          <div className="flex items-center gap-4">
+            <span className="text-sm text-slate-600">
+              {session.user.name || session.user.email}
+            </span>
+            <Link
+              href="/auth/signout"
+              className="rounded-md px-3 py-2 text-sm text-slate-700 hover:bg-slate-100"
+            >
+              Sign Out
+            </Link>
+          </div>
         </div>
-        <nav className="flex items-center gap-2 text-sm">
-          <Link
-            href="/"
-            className="rounded-md px-3 py-2 text-slate-700 hover:bg-slate-100"
-          >
-            Home
-          </Link>
-          <Link
-            href="/dashboard"
-            className="rounded-md px-3 py-2 text-slate-700 hover:bg-slate-100"
-          >
-            Dashboard
-          </Link>
-          <Link
-            href="/auth/signout"
-            className="rounded-md px-3 py-2 text-slate-700 hover:bg-slate-100"
-          >
-            Sign Out
-          </Link>
-        </nav>
-      </div>
+      </header>
 
-      {children}
+      <div className="flex flex-1 overflow-hidden">
+        <aside className="w-48 border-r bg-white px-4 py-6">
+          <nav className="space-y-2">
+            <Link
+              href="/dashboard"
+              className="block rounded-md px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100"
+            >
+              Dashboard
+            </Link>
+            <Link
+              href="/workflows"
+              className="block rounded-md px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100"
+            >
+              Workflows
+            </Link>
+            <Link
+              href="/"
+              className="block rounded-md px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100"
+            >
+              Home
+            </Link>
+          </nav>
+        </aside>
+
+        <main className="flex-1 overflow-auto">
+          <div className="p-6">
+            {children}
+          </div>
+        </main>
+      </div>
     </div>
   );
 }
