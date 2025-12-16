@@ -237,3 +237,193 @@ model Subscription {
   @@index([userId])
   @@map("subscriptions")
 }
+
+// Workspace for multi-tenancy
+model Workspace {
+  id          String   @id @default(cuid())
+  name        String
+  slug        String   @unique
+  ownerId     String
+  settings    Json?    // Workspace-level settings
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  members     WorkspaceMember[]
+  credentials Credential[]
+  apiKeys     ApiKey[]
+  connectors  Connector[]
+  webhooks    Webhook[]
+
+  @@index([ownerId])
+  @@map("workspaces")
+}
+
+model WorkspaceMember {
+  id          String   @id @default(cuid())
+  workspaceId String
+  userId      String
+  role        String   @default("member") // owner, admin, member, viewer
+  createdAt   DateTime @default(now())
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@unique([workspaceId, userId])
+  @@index([workspaceId])
+  @@index([userId])
+  @@map("workspace_members")
+}
+
+// Encrypted credential storage
+model Credential {
+  id                String    @id @default(cuid())
+  workspaceId       String
+  name              String
+  description       String?
+  type              String    // oauth, api_key, basic_auth, token, custom
+  provider          String?   // slack, stripe, discord, smtp, etc.
+  encryptedData     String    @db.Text // Encrypted JSON with credentials
+  metadata          Json?     // Additional metadata (scopes, permissions, etc.)
+  lastRotatedAt     DateTime?
+  rotationPolicy    Json?     // Auto-rotation config
+  expiresAt         DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  createdBy         String
+
+  workspace     Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  connectors    Connector[]
+  auditLogs     AuditLog[]
+
+  @@index([workspaceId])
+  @@index([provider])
+  @@index([type])
+  @@map("credentials")
+}
+
+// API Keys for REST API access
+model ApiKey {
+  id          String    @id @default(cuid())
+  workspaceId String
+  name        String
+  keyHash     String    @unique // Hashed API key
+  keyPrefix   String    // First few chars for identification (e.g., "sk_live_abc...")
+  permissions Json      // Scoped permissions
+  expiresAt   DateTime?
+  lastUsedAt  DateTime?
+  createdAt   DateTime  @default(now())
+  createdBy   String
+
+  workspace Workspace    @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  usageLogs ApiKeyUsage[]
+
+  @@index([workspaceId])
+  @@index([keyHash])
+  @@map("api_keys")
+}
+
+model ApiKeyUsage {
+  id          String   @id @default(cuid())
+  apiKeyId    String
+  endpoint    String
+  method      String
+  statusCode  Int
+  duration    Int      // milliseconds
+  timestamp   DateTime @default(now())
+
+  apiKey ApiKey @relation(fields: [apiKeyId], references: [id], onDelete: Cascade)
+
+  @@index([apiKeyId])
+  @@index([timestamp])
+  @@map("api_key_usage")
+}
+
+// Connector definitions
+model Connector {
+  id           String   @id @default(cuid())
+  workspaceId  String
+  name         String
+  type         String   // slack, smtp, stripe, discord, http, custom
+  description  String?
+  config       Json     // Connector-specific configuration
+  credentialId String?  // Optional link to credential
+  enabled      Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  workspace  Workspace   @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  credential Credential? @relation(fields: [credentialId], references: [id], onDelete: SetNull)
+
+  @@index([workspaceId])
+  @@index([type])
+  @@index([credentialId])
+  @@map("connectors")
+}
+
+// Webhook infrastructure
+model Webhook {
+  id              String    @id @default(cuid())
+  workspaceId     String
+  name            String
+  description     String?
+  url             String    // Webhook endpoint URL
+  secret          String?   // Secret for signature verification
+  events          Json      // Array of event types to listen for
+  headers         Json?     // Custom headers to include
+  retryPolicy     Json?     // Retry configuration
+  enabled         Boolean   @default(true)
+  lastTriggeredAt DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  workspace Workspace           @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  deliveries WebhookDelivery[]
+
+  @@index([workspaceId])
+  @@map("webhooks")
+}
+
+model WebhookDelivery {
+  id            String    @id @default(cuid())
+  webhookId     String
+  eventType     String
+  payload       Json
+  request       Json?     // Request details (headers, body)
+  response      Json?     // Response details (status, headers, body)
+  status        String    @default("pending") // pending, success, failed
+  attemptCount  Int       @default(0)
+  lastAttemptAt DateTime?
+  nextRetryAt   DateTime?
+  error         String?   @db.Text
+  createdAt     DateTime  @default(now())
+
+  webhook Webhook @relation(fields: [webhookId], references: [id], onDelete: Cascade)
+
+  @@index([webhookId])
+  @@index([status])
+  @@index([createdAt])
+  @@map("webhook_deliveries")
+}
+
+// Audit trail
+model AuditLog {
+  id           String   @id @default(cuid())
+  workspaceId  String?  // Optional workspace scoping
+  userId       String?  // Who performed the action
+  action       String   // create, update, delete, access, rotate, etc.
+  resourceType String   // credential, workflow, connector, etc.
+  resourceId   String?
+  credentialId String?  // For credential-specific audits
+  details      Json?    // Additional context
+  ipAddress    String?
+  userAgent    String?
+  timestamp    DateTime @default(now())
+
+  credential Credential? @relation(fields: [credentialId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId])
+  @@index([userId])
+  @@index([resourceType])
+  @@index([credentialId])
+  @@index([timestamp])
+  @@map("audit_logs")
+}
