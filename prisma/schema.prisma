@@ -74,11 +74,18 @@ model Workflow {
   description String?
   userId      String
   isPublic    Boolean  @default(false)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  // Rate limiting and retry configuration
+  rateLimitMaxConcurrent Int?     @default(5)
+  rateLimitPerMinute     Int?     @default(100)
+  retryMaxAttempts       Int      @default(3)
+  retryBackoffMs         Int      @default(1000)
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
 
-  user     User              @relation(fields: [userId], references: [id], onDelete: Cascade)
-  versions WorkflowVersion[]
+  user              User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  versions          WorkflowVersion[]
+  triggers          Trigger[]
+  connectorInstances ConnectorInstance[]
 
   @@index([userId])
   @@map("workflows")
@@ -88,45 +95,127 @@ model WorkflowVersion {
   id          String   @id @default(cuid())
   workflowId  String
   version     Int
-  definition  Json
+  definition  Json     // Full workflow definition including steps
   isActive    Boolean  @default(false)
+  publishedAt DateTime?
   createdAt   DateTime @default(now())
 
   workflow   Workflow    @relation(fields: [workflowId], references: [id], onDelete: Cascade)
   executions Execution[]
+  steps      Step[]
 
   @@unique([workflowId, version])
   @@index([workflowId])
+  @@index([isActive])
   @@map("workflow_versions")
 }
 
-model Execution {
+model Step {
   id                String   @id @default(cuid())
   workflowVersionId String
-  status            String   @default("pending")
-  input             Json?
-  output            Json?
-  startedAt         DateTime @default(now())
-  completedAt       DateTime?
+  name              String
+  type              String   // http_request, transform, conditional, loop, delay, error_handler, fallback, custom_code
+  config            Json     // Step-specific configuration
+  position          Int      // Order in workflow
+  createdAt         DateTime @default(now())
 
-  workflowVersion WorkflowVersion @relation(fields: [workflowVersionId], references: [id], onDelete: Cascade)
-  logs            ExecutionLog[]
+  workflowVersion WorkflowVersion  @relation(fields: [workflowVersionId], references: [id], onDelete: Cascade)
+  executionSteps  ExecutionStep[]
 
   @@index([workflowVersionId])
+  @@map("steps")
+}
+
+model Trigger {
+  id         String   @id @default(cuid())
+  workflowId String
+  type       String   // manual, webhook, schedule, event, api
+  config     Json     // Trigger-specific configuration (cron expression, webhook URL, etc.)
+  enabled    Boolean  @default(true)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  workflow   Workflow     @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+  executions Execution[]
+
+  @@index([workflowId])
+  @@index([type])
+  @@map("triggers")
+}
+
+model ConnectorInstance {
+  id           String   @id @default(cuid())
+  workflowId   String
+  name         String   // e.g., "Production API", "Staging Database"
+  connectorType String  // http, database, email, etc.
+  config       Json     // Connection details, credentials (encrypted)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  workflow Workflow @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+
+  @@index([workflowId])
+  @@map("connector_instances")
+}
+
+model Execution {
+  id                String    @id @default(cuid())
+  workflowVersionId String
+  triggerId         String?   // Which trigger initiated this execution
+  status            String    @default("pending") // pending, running, completed, failed, cancelled
+  input             Json?
+  output            Json?
+  error             String?   @db.Text
+  startedAt         DateTime  @default(now())
+  completedAt       DateTime?
+  durationMs        Int?      // Execution duration in milliseconds
+  retryCount        Int       @default(0)
+
+  workflowVersion WorkflowVersion  @relation(fields: [workflowVersionId], references: [id], onDelete: Cascade)
+  trigger         Trigger?         @relation(fields: [triggerId], references: [id], onDelete: SetNull)
+  logs            ExecutionLog[]
+  steps           ExecutionStep[]
+
+  @@index([workflowVersionId])
+  @@index([triggerId])
   @@index([status])
+  @@index([startedAt])
   @@map("executions")
+}
+
+model ExecutionStep {
+  id          String    @id @default(cuid())
+  executionId String
+  stepId      String
+  status      String    @default("pending") // pending, running, completed, failed, skipped
+  input       Json?
+  output      Json?
+  error       String?   @db.Text
+  startedAt   DateTime  @default(now())
+  completedAt DateTime?
+  durationMs  Int?
+  retryCount  Int       @default(0)
+
+  execution Execution @relation(fields: [executionId], references: [id], onDelete: Cascade)
+  step      Step      @relation(fields: [stepId], references: [id], onDelete: Cascade)
+
+  @@index([executionId])
+  @@index([stepId])
+  @@map("execution_steps")
 }
 
 model ExecutionLog {
   id          String   @id @default(cuid())
   executionId String
-  level       String
+  level       String   // info, warn, error, debug
   message     String   @db.Text
+  metadata    Json?    // Additional context data
   timestamp   DateTime @default(now())
 
   execution Execution @relation(fields: [executionId], references: [id], onDelete: Cascade)
 
   @@index([executionId])
+  @@index([level])
   @@map("execution_logs")
 }
 
