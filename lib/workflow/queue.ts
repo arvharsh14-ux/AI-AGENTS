@@ -24,6 +24,7 @@ export const executionQueue = new Queue('workflow-execution', REDIS_URL, {
 
 export interface DispatchJobData {
   workflowId: string;
+  versionId?: string;
   triggerId?: string;
   input?: Record<string, any>;
   metadata?: Record<string, any>;

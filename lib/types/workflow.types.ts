@@ -32,6 +32,7 @@ export interface StepDefinition {
   position: number;
   nextSteps?: string[]; // IDs of next steps (for conditional flows)
   errorHandler?: string; // ID of error handler step
+  layout?: { x: number; y: number };
 }
 
 export interface RetryPolicy {
