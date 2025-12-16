@@ -22,16 +22,10 @@ export default function HomePage() {
         </p>
         <div className="flex items-center gap-3">
           <Button asChild>
-            <Link href="/dashboard">Go to dashboard</Link>
+            <Link href="/auth/signup">Get Started</Link>
           </Button>
           <Button variant="secondary" asChild>
-            <a
-              href="https://nextjs.org/docs/app"
-              target="_blank"
-              rel="noreferrer noopener"
-            >
-              App Router docs
-            </a>
+            <Link href="/auth/signin">Sign In</Link>
           </Button>
         </div>
       </section>
