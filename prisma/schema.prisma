@@ -39,8 +39,17 @@ model Workspace {
   billingPlanId String?
   billingPlan   BillingPlan? @relation(fields: [billingPlanId], references: [id])
 
+  // Stripe integration
+  stripeCustomerId     String?   @unique
+  stripeSubscriptionId String?   @unique
+
   members       Membership[]
   apiKeys       APIKey[]
+  invites       WorkspaceInvite[]
+  auditLogs     AuditLog[]
+  alertRules    AlertRule[]
+  alertChannels AlertChannel[]
+  usageRecords  UsageRecord[]
   
   // Optional: Workflows can belong to a workspace
   // workflows     Workflow[]
@@ -50,7 +59,7 @@ model Workspace {
 
 model Membership {
   id          String   @id @default(cuid())
-  role        String   @default("member") // owner, admin, member
+  role        String   @default("viewer") // owner, admin, editor, viewer
   userId      String
   workspaceId String
   createdAt   DateTime @default(now())
@@ -63,14 +72,34 @@ model Membership {
   @@map("memberships")
 }
 
+model WorkspaceInvite {
+  id          String   @id @default(cuid())
+  email       String
+  workspaceId String
+  role        String   @default("viewer") // admin, editor, viewer
+  token       String   @unique
+  status      String   @default("pending") // pending, accepted, expired
+  invitedById String
+  createdAt   DateTime @default(now())
+  expiresAt   DateTime
+
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId])
+  @@index([email])
+  @@map("workspace_invites")
+}
+
 model APIKey {
   id          String    @id @default(cuid())
   key         String    @unique
   name        String?
   workspaceId String
+  role        String    @default("viewer") // admin, editor, viewer
   createdAt   DateTime  @default(now())
   expiresAt   DateTime?
   lastUsedAt  DateTime?
+  usageCount  Int       @default(0)
 
   workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
 
@@ -83,8 +112,16 @@ model BillingPlan {
   name        String   // Free, Pro, Enterprise
   price       Int      // Monthly price in cents
   currency    String   @default("USD")
-  features    Json?    // Feature flags/limits
-  stripePriceId String?
+  stripePriceId String? @unique
+  
+  // Limits
+  maxExecutionsPerMonth Int      @default(1000)
+  maxConnectors         Int      @default(5)
+  maxRunMinutesPerMonth Int      @default(100) // Total run minutes
+  maxWorkflows          Int      @default(10)
+  maxTeamMembers        Int      @default(1)
+  
+  features    Json?    // Additional feature flags
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
@@ -301,4 +338,124 @@ model Subscription {
 
   @@index([userId])
   @@map("subscriptions")
+}
+
+// Monitoring and Observability
+model ExecutionMetrics {
+  id                 String   @id @default(cuid())
+  workspaceId        String?
+  userId             String?
+  date               DateTime @db.Date
+  hour               Int?     // Hour of day (0-23) for hourly aggregation
+  
+  totalExecutions    Int      @default(0)
+  successfulExecutions Int    @default(0)
+  failedExecutions   Int      @default(0)
+  
+  totalDurationMs    BigInt   @default(0)
+  minDurationMs      Int?
+  maxDurationMs      Int?
+  avgDurationMs      Float?
+  p50DurationMs      Int?
+  p95DurationMs      Int?
+  p99DurationMs      Int?
+  
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  @@unique([workspaceId, userId, date, hour])
+  @@index([workspaceId, date])
+  @@index([userId, date])
+  @@map("execution_metrics")
+}
+
+model AuditLog {
+  id          String   @id @default(cuid())
+  workspaceId String
+  userId      String?
+  action      String   // workflow.created, member.invited, apikey.created, etc.
+  entityType  String   // workflow, member, apikey, etc.
+  entityId    String?
+  metadata    Json?    // Additional context
+  ipAddress   String?
+  userAgent   String?
+  timestamp   DateTime @default(now())
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId, timestamp])
+  @@index([userId])
+  @@index([action])
+  @@map("audit_logs")
+}
+
+model AlertRule {
+  id          String   @id @default(cuid())
+  workspaceId String
+  name        String
+  type        String   // execution_failure, rate_limit_breach, quota_warning
+  enabled     Boolean  @default(true)
+  conditions  Json     // Conditions for triggering alert
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  workspace     Workspace      @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  notifications AlertNotification[]
+
+  @@index([workspaceId])
+  @@map("alert_rules")
+}
+
+model AlertChannel {
+  id          String   @id @default(cuid())
+  workspaceId String
+  type        String   // email, slack
+  name        String
+  config      Json     // Email addresses or Slack webhook URL
+  enabled     Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  workspace     Workspace           @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  notifications AlertNotification[]
+
+  @@index([workspaceId])
+  @@map("alert_channels")
+}
+
+model AlertNotification {
+  id             String   @id @default(cuid())
+  alertRuleId    String
+  alertChannelId String
+  status         String   @default("pending") // pending, sent, failed
+  message        String   @db.Text
+  sentAt         DateTime?
+  error          String?  @db.Text
+  createdAt      DateTime @default(now())
+
+  alertRule    AlertRule    @relation(fields: [alertRuleId], references: [id], onDelete: Cascade)
+  alertChannel AlertChannel @relation(fields: [alertChannelId], references: [id], onDelete: Cascade)
+
+  @@index([alertRuleId])
+  @@index([alertChannelId])
+  @@index([status])
+  @@map("alert_notifications")
+}
+
+model UsageRecord {
+  id             String   @id @default(cuid())
+  workspaceId    String
+  date           DateTime @db.Date
+  executionCount Int      @default(0)
+  runMinutes     Float    @default(0)
+  connectorCount Int      @default(0)
+  workflowCount  Int      @default(0)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@unique([workspaceId, date])
+  @@index([workspaceId, date])
+  @@map("usage_records")
 }

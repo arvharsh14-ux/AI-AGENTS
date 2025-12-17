@@ -1,5 +1,7 @@
 import { executionService } from '@/lib/services/execution.service';
 import { workflowService } from '@/lib/services/workflow.service';
+import { checkQuota, trackUsage } from '@/lib/services/usage.service';
+import { prisma } from '@/lib/prisma';
 import { HttpRequestRunner } from './step-runners/http-request';
 import { TransformRunner } from './step-runners/transform';
 import { ConditionalRunner } from './step-runners/conditional';
@@ -27,6 +29,25 @@ export class WorkflowExecutor {
     
     if (!execution) {
       throw new Error('Execution not found');
+    }
+
+    // Check quota before executing
+    const userId = execution.workflowVersion.workflow.userId;
+    const membership = await prisma.membership.findFirst({
+      where: { userId },
+      include: { workspace: true },
+    });
+
+    if (membership) {
+      const quotaCheck = await checkQuota(membership.workspaceId);
+      if (!quotaCheck.allowed) {
+        await executionService.updateExecution(executionId, {
+          status: 'failed',
+          error: quotaCheck.reason,
+          completedAt: new Date(),
+        });
+        throw new Error(quotaCheck.reason);
+      }
     }
 
     const startTime = Date.now();
@@ -176,6 +197,11 @@ export class WorkflowExecutor {
         output: context.variables,
         duration,
       });
+
+      // Track usage after successful execution
+      if (membership) {
+        await trackUsage(membership.workspaceId);
+      }
     } catch (error: any) {
       const duration = Date.now() - startTime;
 

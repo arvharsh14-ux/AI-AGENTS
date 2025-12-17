@@ -25,20 +25,55 @@ async function main() {
     console.log('Demo user already exists');
   }
 
-  // Create Billing Plan
+  // Create Billing Plans
   let billingPlan = await prisma.billingPlan.findFirst({ where: { name: 'Free' } });
   if (!billingPlan) {
     billingPlan = await prisma.billingPlan.create({
       data: {
         name: 'Free',
         price: 0,
-        features: {
-          maxWorkflows: 5,
-          maxExecutions: 100,
-        },
+        maxExecutionsPerMonth: 1000,
+        maxConnectors: 5,
+        maxRunMinutesPerMonth: 100,
+        maxWorkflows: 10,
+        maxTeamMembers: 1,
       },
     });
     console.log('✅ Created billing plan: Free');
+  }
+
+  let proPlan = await prisma.billingPlan.findFirst({ where: { name: 'Pro' } });
+  if (!proPlan) {
+    proPlan = await prisma.billingPlan.create({
+      data: {
+        name: 'Pro',
+        price: 4900, // $49/month
+        stripePriceId: 'price_pro_monthly',
+        maxExecutionsPerMonth: 50000,
+        maxConnectors: 50,
+        maxRunMinutesPerMonth: 5000,
+        maxWorkflows: 100,
+        maxTeamMembers: 10,
+      },
+    });
+    console.log('✅ Created billing plan: Pro');
+  }
+
+  let enterprisePlan = await prisma.billingPlan.findFirst({ where: { name: 'Enterprise' } });
+  if (!enterprisePlan) {
+    enterprisePlan = await prisma.billingPlan.create({
+      data: {
+        name: 'Enterprise',
+        price: 19900, // $199/month
+        stripePriceId: 'price_enterprise_monthly',
+        maxExecutionsPerMonth: 500000,
+        maxConnectors: 500,
+        maxRunMinutesPerMonth: 50000,
+        maxWorkflows: 1000,
+        maxTeamMembers: 100,
+      },
+    });
+    console.log('✅ Created billing plan: Enterprise');
   }
 
   // Create Workspace
@@ -62,6 +97,7 @@ async function main() {
           create: {
             key: 'sk_test_demo_key_123456789',
             name: 'Demo Key',
+            role: 'admin',
           },
         },
       },
