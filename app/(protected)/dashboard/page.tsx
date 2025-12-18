@@ -1,5 +1,6 @@
 import { requireAuth } from '@/lib/auth-helpers';
 import { workflowService } from '@/lib/services/workflow.service';
+import { billingService } from '@/lib/services/billing.service';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
@@ -7,18 +8,51 @@ import Link from 'next/link';
 export default async function DashboardPage() {
   const session = await requireAuth();
   const workflows = await workflowService.listWorkflows(session.user.id);
+  const plan = await billingService.getPlanForUser(session.user.id);
 
   const activeWorkflows = workflows.filter((w) => w.versions.some((v) => v.isActive)).length;
   const totalWorkflows = workflows.length;
+  const canCreateWorkflow =
+    plan.tier === 'pro' || totalWorkflows < plan.limits.maxWorkflows;
 
   return (
     <div className="space-y-8">
       <div className="flex items-center justify-between">
         <h1 className="text-3xl font-semibold tracking-tight">Dashboard</h1>
-        <Button asChild>
-          <Link href="/workflows/create">Create Workflow</Link>
-        </Button>
+        {canCreateWorkflow ? (
+          <Button asChild>
+            <Link href="/workflows/create">Create Workflow</Link>
+          </Button>
+        ) : (
+          <Button asChild variant="secondary">
+            <Link href="/settings/billing">Upgrade to create more</Link>
+          </Button>
+        )}
       </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Plan</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <p className="text-sm text-slate-600">
+                {plan.tier === 'pro' ? 'Pro' : 'Free'}
+                {plan.subscription?.status ? ` · ${plan.subscription.status}` : ''}
+              </p>
+              <p className="text-sm text-slate-600">
+                Workflows: {totalWorkflows}/{String(plan.limits.maxWorkflows)}
+              </p>
+            </div>
+            {plan.tier === 'free' && (
+              <Button asChild size="sm">
+                <Link href="/settings/billing">Upgrade</Link>
+              </Button>
+            )}
+          </div>
+        </CardContent>
+      </Card>
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <Card>

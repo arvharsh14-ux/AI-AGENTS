@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { workflowService } from '@/lib/services/workflow.service';
+import { billingService } from '@/lib/services/billing.service';
 
 export async function GET(request: NextRequest) {
   try {
@@ -42,6 +43,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    await billingService.assertCanCreateWorkflow(session.user.id);
+
     const workflow = await workflowService.createWorkflow({
       name,
       description,
@@ -55,10 +58,16 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ workflow }, { status: 201 });
   } catch (error: any) {
+    const message = error?.message || 'Failed to create workflow';
+
+    if (message.includes('Free plan limit')) {
+      return NextResponse.json(
+        { error: message, code: 'PLAN_LIMIT' },
+        { status: 402 }
+      );
+    }
+
     console.error('Failed to create workflow:', error);
-    return NextResponse.json(
-      { error: 'Failed to create workflow' },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: 'Failed to create workflow' }, { status: 500 });
   }
 }
