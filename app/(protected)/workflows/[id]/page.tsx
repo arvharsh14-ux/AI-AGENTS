@@ -24,7 +24,7 @@ export default async function WorkflowDetailPage({
 
   const plan = await billingService.getPlanForUser(session.user.id);
 
-  const activeVersion = workflow.versions.find((v) => v.isActive);
+  const activeVersion = workflow.versions.find((v: any) => v.isActive);
   const latestVersion = workflow.versions[workflow.versions.length - 1];
   const workingVersion = latestVersion || activeVersion;
 

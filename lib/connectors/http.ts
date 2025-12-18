@@ -2,6 +2,8 @@ import axios from 'axios';
 import { BaseConnector, ConnectorAction, ConnectorConfig } from './base-connector';
 import { interpolateVariables } from '@/lib/workflow/interpolation';
 import type { ExecutionContext, StepResult } from '@/lib/types/workflow.types';
+import type { HttpConnectorInstanceConfig } from './http.types';
+import { encrypt, hashApiKey } from '@/lib/encryption';
 
 export class HttpConnector extends BaseConnector {
   readonly type = 'http';
@@ -109,3 +111,68 @@ export class HttpConnector extends BaseConnector {
 }
 
 export const httpConnector = new HttpConnector();
+
+// Simplified input type for creating connector configs
+interface HttpConnectorConfigInput {
+  baseUrl: string;
+  auth:
+    | { type: 'none' }
+    | { type: 'api_key'; headerName: string; apiKey: string }
+    | { type: 'bearer_token'; token: string }
+    | { type: 'basic'; username: string; password: string };
+}
+
+export function createHttpConnectorConfig(
+  input: HttpConnectorConfigInput
+): HttpConnectorInstanceConfig {
+  const { baseUrl, auth } = input;
+
+  switch (auth.type) {
+    case 'api_key': {
+      const encryptedApiKey = encrypt(auth.apiKey);
+      return {
+        baseUrl,
+        auth: {
+          type: 'api_key',
+          headerName: auth.headerName,
+          encryptedApiKey,
+          apiKeyLast4: auth.apiKey.slice(-4),
+        },
+      };
+    }
+
+    case 'bearer_token': {
+      const encryptedToken = encrypt(auth.token);
+      return {
+        baseUrl,
+        auth: {
+          type: 'bearer_token',
+          encryptedToken,
+          tokenLast4: auth.token.slice(-4),
+        },
+      };
+    }
+
+    case 'basic': {
+      const encryptedPassword = encrypt(auth.password);
+      return {
+        baseUrl,
+        auth: {
+          type: 'basic',
+          username: auth.username,
+          encryptedPassword,
+          passwordLast4: auth.password.slice(-4),
+        },
+      };
+    }
+
+    case 'none':
+    default:
+      return {
+        baseUrl,
+        auth: {
+          type: 'none',
+        },
+      };
+  }
+}

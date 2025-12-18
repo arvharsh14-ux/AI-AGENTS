@@ -10,7 +10,7 @@ export default async function DashboardPage() {
   const workflows = await workflowService.listWorkflows(session.user.id);
   const plan = await billingService.getPlanForUser(session.user.id);
 
-  const activeWorkflows = workflows.filter((w) => w.versions.some((v) => v.isActive)).length;
+  const activeWorkflows = workflows.filter((w: any) => w.versions.some((v: any) => v.isActive)).length;
   const totalWorkflows = workflows.length;
   const canCreateWorkflow =
     plan.tier === 'pro' || totalWorkflows < plan.limits.maxWorkflows;
@@ -109,7 +109,7 @@ export default async function DashboardPage() {
             <p className="text-sm text-slate-600">No workflows yet. Create one to get started.</p>
           ) : (
             <div className="space-y-4">
-              {workflows.slice(0, 5).map((workflow) => (
+              {workflows.slice(0, 5).map((workflow: any) => (
                 <div
                   key={workflow.id}
                   className="flex items-center justify-between border-b pb-4 last:border-0"
@@ -120,11 +120,11 @@ export default async function DashboardPage() {
                   </div>
                   <div className="flex items-center gap-2">
                     <span className={`inline-block rounded-full px-2.5 py-0.5 text-xs font-medium ${
-                      workflow.versions.some((v) => v.isActive)
+                      workflow.versions.some((v: any) => v.isActive)
                         ? 'bg-green-100 text-green-800'
                         : 'bg-slate-100 text-slate-800'
                     }`}>
-                      {workflow.versions.some((v) => v.isActive) ? 'Active' : 'Draft'}
+                      {workflow.versions.some((v: any) => v.isActive) ? 'Active' : 'Draft'}
                     </span>
                     <Button variant="secondary" size="sm" asChild>
                       <Link href={`/workflows/${workflow.id}`}>Edit</Link>

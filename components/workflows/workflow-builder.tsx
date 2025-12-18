@@ -6,7 +6,7 @@ import { StepLibrary } from './step-library';
 import { WorkflowCanvas } from './workflow-canvas';
 import { StepEditor } from './step-editor';
 import { TestPanel } from './test-panel';
-import type { Workflow, WorkflowVersion } from '@prisma/client';
+// import type { Workflow, WorkflowVersion } from '@prisma/client';
 import type { WorkflowDefinition, StepDefinition } from '@/lib/types/workflow.types';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
