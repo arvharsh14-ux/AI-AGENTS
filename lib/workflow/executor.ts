@@ -8,11 +8,12 @@ import { ConditionalRunner } from './step-runners/conditional';
 import { LoopRunner } from './step-runners/loop';
 import { DelayRunner } from './step-runners/delay';
 import { CustomCodeRunner } from './step-runners/custom-code';
+import { ConnectorRunner } from './step-runners/connector';
 import type { BaseStepRunner } from './step-runners/base';
 import type { ExecutionContext, StepType, StepResult } from '@/lib/types/workflow.types';
 import { emitExecutionEvent } from './socket';
 
-const stepRunners: Record<StepType, BaseStepRunner> = {
+const stepRunners: Record<string, BaseStepRunner> = {
   http_request: new HttpRequestRunner(),
   transform: new TransformRunner(),
   conditional: new ConditionalRunner(),
@@ -21,6 +22,7 @@ const stepRunners: Record<StepType, BaseStepRunner> = {
   error_handler: new TransformRunner(),
   fallback: new TransformRunner(),
   custom_code: new CustomCodeRunner(),
+  connector: new ConnectorRunner(),
 };
 
 export class WorkflowExecutor {
@@ -101,7 +103,7 @@ export class WorkflowExecutor {
             stepName: step.name,
           });
 
-          const runner = stepRunners[step.type as StepType];
+          const runner = stepRunners[step.type as string];
           
           if (!runner) {
             throw new Error(`Unknown step type: ${step.type}`);

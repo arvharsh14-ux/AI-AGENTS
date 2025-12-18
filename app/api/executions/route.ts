@@ -1,48 +1,38 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { requireAuth } from '@/lib/auth-helpers';
+import { getServerSession } from 'next-auth';
+import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 
-export async function GET(req: NextRequest) {
-  const session = await requireAuth();
-  const { searchParams } = new URL(req.url);
+export async function GET(request: NextRequest) {
+  try {
+    const session = await getServerSession(authOptions);
 
-  const status = searchParams.get('status') || undefined;
-  const workflowId = searchParams.get('workflowId') || undefined;
-  const startDate = searchParams.get('startDate') ? new Date(searchParams.get('startDate')!) : undefined;
-  const endDate = searchParams.get('endDate') ? new Date(searchParams.get('endDate')!) : undefined;
-  const skip = searchParams.get('skip') ? parseInt(searchParams.get('skip')!) : 0;
-  const take = searchParams.get('take') ? parseInt(searchParams.get('take')!) : 50;
-  const format = searchParams.get('format') as 'csv' | 'json' | null;
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
 
-  const where: any = {
-    workflowVersion: {
-      workflow: {
-        userId: session.user.id,
-      },
-    },
-  };
+    const { searchParams } = new URL(request.url);
+    const workflowId = searchParams.get('workflowId');
+    const limit = parseInt(searchParams.get('limit') || '50', 10);
+    const offset = parseInt(searchParams.get('offset') || '0', 10);
 
-  if (status) {
-    where.status = status;
-  }
+    const where: any = {};
 
-  if (workflowId) {
+    if (workflowId) {
+      where.workflowVersion = {
+        workflowId,
+      };
+    }
+
+    // Filter by user's workflows
     where.workflowVersion = {
+      ...where.workflowVersion,
       workflow: {
-        id: workflowId,
         userId: session.user.id,
       },
     };
-  }
 
-  if (startDate || endDate) {
-    where.startedAt = {};
-    if (startDate) where.startedAt.gte = startDate;
-    if (endDate) where.startedAt.lte = endDate;
-  }
-
-  const [executions, total] = await Promise.all([
-    prisma.execution.findMany({
+    const executions = await prisma.execution.findMany({
       where,
       include: {
         workflowVersion: {
@@ -55,62 +45,33 @@ export async function GET(req: NextRequest) {
             },
           },
         },
-        trigger: true,
-        steps: {
-          include: {
-            step: true,
+        trigger: {
+          select: {
+            id: true,
+            type: true,
           },
         },
-        logs: {
-          orderBy: { timestamp: 'asc' },
-        },
       },
-      orderBy: { startedAt: 'desc' },
-      skip,
-      take,
-    }),
-    prisma.execution.count({ where }),
-  ]);
-
-  if (format === 'csv') {
-    const headers = [
-      'ID',
-      'Workflow',
-      'Status',
-      'Started At',
-      'Completed At',
-      'Duration (ms)',
-      'Retry Count',
-    ];
-
-    const rows = executions.map((exec) => [
-      exec.id,
-      exec.workflowVersion.workflow.name,
-      exec.status,
-      exec.startedAt.toISOString(),
-      exec.completedAt?.toISOString() || '',
-      exec.durationMs?.toString() || '',
-      exec.retryCount.toString(),
-    ]);
-
-    const csv = [headers, ...rows].map((row) => row.join(',')).join('\n');
-
-    return new NextResponse(csv, {
-      headers: {
-        'Content-Type': 'text/csv',
-        'Content-Disposition': `attachment; filename="executions-${new Date().toISOString()}.csv"`,
+      orderBy: {
+        startedAt: 'desc',
       },
+      take: limit,
+      skip: offset,
     });
-  }
 
-  if (format === 'json') {
-    return new NextResponse(JSON.stringify(executions, null, 2), {
-      headers: {
-        'Content-Type': 'application/json',
-        'Content-Disposition': `attachment; filename="executions-${new Date().toISOString()}.json"`,
-      },
+    const total = await prisma.execution.count({ where });
+
+    return NextResponse.json({
+      executions,
+      total,
+      limit,
+      offset,
     });
+  } catch (error: any) {
+    console.error('Failed to fetch executions:', error);
+    return NextResponse.json(
+      { error: 'Failed to fetch executions' },
+      { status: 500 }
+    );
   }
-
-  return NextResponse.json({ executions, total });
 }

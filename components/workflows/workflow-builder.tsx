@@ -13,6 +13,14 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 interface WorkflowBuilderProps {
   workflow: Workflow;
   version: WorkflowVersion;
+  plan: {
+    tier: 'free' | 'pro';
+    limits: {
+      maxWorkflows: number;
+      maxStepsPerWorkflow: number;
+      maxConnectorsPerWorkflow: number;
+    };
+  };
 }
 
 export function WorkflowBuilder({ workflow, version }: WorkflowBuilderProps) {

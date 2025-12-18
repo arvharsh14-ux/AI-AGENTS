@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { workflowService } from '@/lib/services/workflow.service';
+import { billingService } from '@/lib/services/billing.service';
 
 export async function POST(
   request: NextRequest,
@@ -34,6 +35,10 @@ export async function POST(
       );
     }
 
+    if (publish) {
+      await billingService.assertCanPublishDefinition(session.user.id, definition);
+    }
+
     let version = await workflowService.createVersion(params.id, definition);
 
     if (publish && version) {
@@ -45,10 +50,16 @@ export async function POST(
 
     return NextResponse.json({ version }, { status: 201 });
   } catch (error: any) {
+    const message = error?.message || 'Failed to create version';
+
+    if (message.includes('Free plan limit')) {
+      return NextResponse.json(
+        { error: message, code: 'PLAN_LIMIT' },
+        { status: 402 }
+      );
+    }
+
     console.error('Failed to create version:', error);
-    return NextResponse.json(
-      { error: 'Failed to create version' },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: 'Failed to create version' }, { status: 500 });
   }
 }
