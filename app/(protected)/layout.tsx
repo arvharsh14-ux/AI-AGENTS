@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { requireAuth } from '@/lib/auth-helpers';
+import { SocketProvider } from '@/components/providers/socket-provider';
 
 export default async function ProtectedLayout({
   children,
@@ -7,7 +8,8 @@ export default async function ProtectedLayout({
   const session = await requireAuth();
 
   return (
-    <div className="flex h-screen flex-col bg-slate-50">
+    <SocketProvider>
+      <div className="flex h-screen flex-col bg-slate-50">
       <header className="border-b bg-white px-6 py-4">
         <div className="flex items-center justify-between">
           <h1 className="text-xl font-semibold text-slate-900">Workflow Builder</h1>
@@ -77,6 +79,7 @@ export default async function ProtectedLayout({
           </div>
         </main>
       </div>
-    </div>
+      </div>
+    </SocketProvider>
   );
 }

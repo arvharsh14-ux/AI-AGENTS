@@ -17,18 +17,22 @@ export async function GET(
     const execution = await executionService.getExecution(params.id);
 
     if (!execution) {
-      return NextResponse.json({ error: 'Execution not found' }, { status: 404 });
+      return NextResponse.json(
+        { error: 'Execution not found' },
+        { status: 404 }
+      );
     }
 
+    // Check if user owns the workflow
     if (execution.workflowVersion.workflow.userId !== session.user.id) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
-    return NextResponse.json({ execution });
+    return NextResponse.json(execution);
   } catch (error: any) {
-    console.error('Failed to get execution:', error);
+    console.error('Failed to fetch execution:', error);
     return NextResponse.json(
-      { error: 'Failed to get execution' },
+      { error: 'Failed to fetch execution' },
       { status: 500 }
     );
   }

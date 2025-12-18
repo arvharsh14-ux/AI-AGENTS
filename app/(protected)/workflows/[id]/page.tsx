@@ -4,6 +4,7 @@ import { billingService } from '@/lib/services/billing.service';
 import { notFound } from 'next/navigation';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { WorkflowBuilder } from '@/components/workflows/workflow-builder';
+import { ExecutionMonitor } from '@/components/workflows/execution-monitor';
 
 export default async function WorkflowDetailPage({
   params,
@@ -63,6 +64,15 @@ export default async function WorkflowDetailPage({
           ) : (
             <p className="text-slate-600">No workflow version found. Create steps to get started.</p>
           )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Recent Executions</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <ExecutionMonitor workflowId={workflow.id} />
         </CardContent>
       </Card>
     </div>
