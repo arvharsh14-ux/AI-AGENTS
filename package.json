@@ -21,7 +21,8 @@
     "db:push": "prisma db push",
     "db:seed": "tsx prisma/seed.ts",
     "db:studio": "prisma studio",
-    "workers": "tsx lib/workflow/start-workers.ts"
+    "workers": "tsx lib/workflow/start-workers.ts",
+    "cron:metrics": "tsx lib/cron/aggregate-metrics.ts"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"

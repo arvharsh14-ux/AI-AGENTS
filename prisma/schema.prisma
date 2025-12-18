@@ -41,8 +41,17 @@ model Workspace {
   billingPlanId String?
   billingPlan   BillingPlan? @relation(fields: [billingPlanId], references: [id])
 
+  // Stripe integration
+  stripeCustomerId     String?   @unique
+  stripeSubscriptionId String?   @unique
+
   members       Membership[]
   apiKeys       APIKey[]
+  invites       WorkspaceInvite[]
+  auditLogs     AuditLog[]
+  alertRules    AlertRule[]
+  alertChannels AlertChannel[]
+  usageRecords  UsageRecord[]
   
   // Optional: Workflows can belong to a workspace
   // workflows     Workflow[]
@@ -52,7 +61,7 @@ model Workspace {
 
 model Membership {
   id          String   @id @default(cuid())
-  role        String   @default("member") // owner, admin, member
+  role        String   @default("viewer") // owner, admin, editor, viewer
   userId      String
   workspaceId String
   createdAt   DateTime @default(now())
@@ -65,14 +74,34 @@ model Membership {
   @@map("memberships")
 }
 
+model WorkspaceInvite {
+  id          String   @id @default(cuid())
+  email       String
+  workspaceId String
+  role        String   @default("viewer") // admin, editor, viewer
+  token       String   @unique
+  status      String   @default("pending") // pending, accepted, expired
+  invitedById String
+  createdAt   DateTime @default(now())
+  expiresAt   DateTime
+
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId])
+  @@index([email])
+  @@map("workspace_invites")
+}
+
 model APIKey {
   id          String    @id @default(cuid())
   key         String    @unique
   name        String?
   workspaceId String
+  role        String    @default("viewer") // admin, editor, viewer
   createdAt   DateTime  @default(now())
   expiresAt   DateTime?
   lastUsedAt  DateTime?
+  usageCount  Int       @default(0)
 
   workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
 
@@ -85,8 +114,16 @@ model BillingPlan {
   name        String   // Free, Pro, Enterprise
   price       Int      // Monthly price in cents
   currency    String   @default("USD")
-  features    Json?    // Feature flags/limits
-  stripePriceId String?
+  stripePriceId String? @unique
+  
+  // Limits
+  maxExecutionsPerMonth Int      @default(1000)
+  maxConnectors         Int      @default(5)
+  maxRunMinutesPerMonth Int      @default(100) // Total run minutes
+  maxWorkflows          Int      @default(10)
+  maxTeamMembers        Int      @default(1)
+  
+  features    Json?    // Additional feature flags
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
