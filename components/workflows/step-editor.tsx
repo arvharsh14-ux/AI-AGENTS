@@ -7,24 +7,17 @@ import { Select } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import type { WorkflowConnector } from './connectors-manager';
-
-interface Step {
-  id: string;
-  name: string;
-  type: 'http_request' | 'transform' | 'conditional' | 'loop' | 'delay' | 'error_handler' | 'fallback' | 'custom_code';
-  config: Record<string, any>;
-  position: number;
-}
+import { StepDefinition, StepType } from '@/lib/types/workflow.types';
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 
 interface StepEditorProps {
-  step: Step;
-  connectors: WorkflowConnector[];
-  onSave: (step: Step) => void;
+  step: StepDefinition;
+  previousSteps?: StepDefinition[];
+  onSave: (step: StepDefinition) => void;
   onCancel: () => void;
 }
 
-const STEP_TYPES = [
+const STEP_TYPES: { value: StepType; label: string }[] = [
   { value: 'http_request', label: 'HTTP Request' },
   { value: 'transform', label: 'Transform' },
   { value: 'conditional', label: 'Conditional' },
@@ -33,13 +26,8 @@ const STEP_TYPES = [
   { value: 'custom_code', label: 'Custom Code' },
 ];
 
-export function StepEditor({
-  step: initialStep,
-  connectors,
-  onSave,
-  onCancel,
-}: StepEditorProps) {
-  const [step, setStep] = useState<Step>(initialStep);
+export function StepEditor({ step: initialStep, previousSteps = [], onSave, onCancel }: StepEditorProps) {
+  const [step, setStep] = useState<StepDefinition>(initialStep);
 
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -56,14 +44,17 @@ export function StepEditor({
     });
   };
 
+  const copyVariable = (path: string) => {
+    navigator.clipboard.writeText(`{{${path}}}`);
+  };
+
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>
-          {step.name ? `Edit: ${step.name}` : 'Add New Step'}
-        </CardTitle>
-      </CardHeader>
-      <CardContent>
+    <div className="flex flex-col h-full">
+      <div className="p-4 border-b bg-white">
+        <h3 className="font-semibold text-lg">{step.name ? `Edit: ${step.name}` : 'Edit Step'}</h3>
+      </div>
+      
+      <div className="flex-1 overflow-y-auto p-4 space-y-6">
         <form onSubmit={handleSubmit} className="space-y-6">
           <div className="space-y-2">
             <Label htmlFor="name">Step Name</Label>
@@ -81,7 +72,7 @@ export function StepEditor({
             <Select
               id="type"
               value={step.type}
-              onChange={(e) => setStep({ ...step, type: e.target.value as Step['type'] })}
+              onChange={(e) => setStep({ ...step, type: e.target.value as StepType })}
             >
               {STEP_TYPES.map((type) => (
                 <option key={type.value} value={type.value}>
@@ -250,6 +241,21 @@ return { transformed: input };"
             </div>
           )}
 
+          {step.type === 'conditional' && (
+            <div className="space-y-2">
+              <Label htmlFor="condition">Condition (JS Expression)</Label>
+              <Textarea
+                id="condition"
+                value={step.config.condition || ''}
+                onChange={(e) => handleConfigChange('condition', e.target.value)}
+                placeholder="variables.stepName.output.value > 10"
+              />
+              <p className="text-xs text-slate-500">
+                Return true or false. Available: input, variables.
+              </p>
+            </div>
+          )}
+
           {step.type === 'delay' && (
             <div className="space-y-2">
               <Label htmlFor="milliseconds">Milliseconds</Label>
@@ -291,16 +297,33 @@ return { transformed: input };"
             </>
           )}
 
-          <div className="flex gap-4 pt-4">
-            <Button type="submit">
-              {initialStep.id ? 'Update Step' : 'Add Step'}
-            </Button>
-            <Button type="button" variant="secondary" onClick={onCancel}>
-              Cancel
-            </Button>
+          <div className="pt-4 flex gap-2">
+             <Button type="submit" size="sm">Update Step</Button>
+             <Button type="button" variant="ghost" size="sm" onClick={onCancel}>Close</Button>
           </div>
         </form>
-      </CardContent>
-    </Card>
+
+        {previousSteps.length > 0 && (
+          <div className="mt-8 border-t pt-4">
+             <h4 className="text-sm font-semibold mb-2">Available Variables</h4>
+             <p className="text-xs text-slate-500 mb-2">Click to copy path</p>
+             <div className="space-y-2">
+               {previousSteps.map(s => (
+                 <div key={s.id} className="text-xs">
+                   <div className="font-medium text-slate-700 mb-1">{s.name}</div>
+                   <div 
+                     className="bg-slate-100 p-1 rounded cursor-pointer hover:bg-slate-200 truncate font-mono"
+                     onClick={() => copyVariable(`${s.name}.output`)}
+                     title="Click to copy"
+                   >
+                     {`{{${s.name}.output}}`}
+                   </div>
+                 </div>
+               ))}
+             </div>
+          </div>
+        )}
+      </div>
+    </div>
   );
 }

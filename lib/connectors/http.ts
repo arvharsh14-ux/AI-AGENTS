@@ -1,137 +1,111 @@
-import { decryptString, encryptString } from '@/lib/security/encryption';
-import type {
-  DecryptedHttpConnectorInstanceConfig,
-  HttpConnectorInstanceConfig,
-} from './http.types';
+import axios from 'axios';
+import { BaseConnector, ConnectorAction, ConnectorConfig } from './base-connector';
+import { interpolateVariables } from '@/lib/workflow/interpolation';
+import type { ExecutionContext, StepResult } from '@/lib/types/workflow.types';
 
-export function normalizeBaseUrl(url: string): string {
-  return url.endsWith('/') ? url.slice(0, -1) : url;
-}
-
-export function joinUrl(baseUrl: string, path: string): string {
-  const base = normalizeBaseUrl(baseUrl);
-  const p = path.startsWith('/') ? path : `/${path}`;
-  return `${base}${p}`;
-}
-
-export function createHttpConnectorConfig(input: {
-  baseUrl: string;
-  auth:
-    | { type: 'none' }
-    | { type: 'api_key'; headerName: string; apiKey: string }
-    | { type: 'bearer_token'; token: string }
-    | { type: 'basic'; username: string; password: string };
-}): HttpConnectorInstanceConfig {
-  const baseUrl = normalizeBaseUrl(input.baseUrl);
-
-  if (input.auth.type === 'none') {
-    return { baseUrl, auth: { type: 'none' } };
-  }
-
-  if (input.auth.type === 'api_key') {
-    const apiKeyLast4 = input.auth.apiKey.slice(-4);
-    return {
-      baseUrl,
-      auth: {
-        type: 'api_key',
-        headerName: input.auth.headerName,
-        encryptedApiKey: encryptString(input.auth.apiKey),
-        apiKeyLast4,
+export class HttpConnector extends BaseConnector {
+  readonly type = 'http';
+  readonly name = 'HTTP';
+  readonly description = 'Make HTTP requests with optional authentication';
+  
+  readonly actions: ConnectorAction[] = [
+    {
+      name: 'request',
+      description: 'Make an HTTP request',
+      inputSchema: {
+        method: { type: 'string', required: true, description: 'HTTP method (GET, POST, etc.)' },
+        url: { type: 'string', required: true, description: 'Request URL' },
+        headers: { type: 'object', required: false, description: 'Request headers' },
+        body: { type: 'object', required: false, description: 'Request body' },
+        params: { type: 'object', required: false, description: 'Query parameters' },
+        timeout: { type: 'number', required: false, description: 'Request timeout in ms' },
       },
-    };
-  }
-
-  if (input.auth.type === 'bearer_token') {
-    const tokenLast4 = input.auth.token.slice(-4);
-    return {
-      baseUrl,
-      auth: {
-        type: 'bearer_token',
-        encryptedToken: encryptString(input.auth.token),
-        tokenLast4,
+      outputSchema: {
+        status: { type: 'number' },
+        headers: { type: 'object' },
+        data: { type: 'any' },
       },
-    };
-  }
-
-  const passwordLast4 = input.auth.password.slice(-4);
-  return {
-    baseUrl,
-    auth: {
-      type: 'basic',
-      username: input.auth.username,
-      encryptedPassword: encryptString(input.auth.password),
-      passwordLast4,
     },
-  };
-}
+  ];
 
-export function decryptHttpConnectorConfig(
-  config: HttpConnectorInstanceConfig
-): DecryptedHttpConnectorInstanceConfig {
-  const auth = config.auth;
+  async execute(
+    action: string,
+    config: ConnectorConfig,
+    context: ExecutionContext
+  ): Promise<StepResult> {
+    try {
+      const interpolatedConfig = interpolateVariables(config, {
+        input: context.input,
+        variables: context.variables,
+        metadata: context.metadata,
+      }) as ConnectorConfig;
 
-  if (auth.type === 'none') {
-    return { baseUrl: config.baseUrl, auth: { type: 'none' } };
+      let headers = interpolatedConfig.headers || {};
+
+      if (config.credentialId) {
+        const credentials = await this.getCredentials(config.credentialId, context.userId || '');
+        headers = this.applyAuth(headers, credentials);
+      }
+
+      switch (action) {
+        case 'request':
+          return await this.makeRequest({ ...interpolatedConfig, headers });
+        default:
+          return this.createErrorResult(`Unknown action: ${action}`);
+      }
+    } catch (error: any) {
+      return this.createErrorResult(error.message || 'HTTP connector failed');
+    }
   }
 
-  if (auth.type === 'api_key') {
-    return {
-      baseUrl: config.baseUrl,
-      auth: {
-        type: 'api_key',
-        headerName: auth.headerName,
-        apiKey: decryptString(auth.encryptedApiKey),
-        apiKeyLast4: auth.apiKeyLast4,
+  private applyAuth(headers: Record<string, any>, credentials: Record<string, any>): Record<string, any> {
+    const authHeaders = { ...headers };
+
+    if (credentials.type === 'bearer' && credentials.token) {
+      authHeaders['Authorization'] = `Bearer ${credentials.token}`;
+    } else if (credentials.type === 'basic' && credentials.username && credentials.password) {
+      const encoded = Buffer.from(`${credentials.username}:${credentials.password}`).toString('base64');
+      authHeaders['Authorization'] = `Basic ${encoded}`;
+    } else if (credentials.type === 'api_key') {
+      if (credentials.header) {
+        authHeaders[credentials.header] = credentials.api_key;
+      } else {
+        authHeaders['X-API-Key'] = credentials.api_key;
+      }
+    }
+
+    return authHeaders;
+  }
+
+  private async makeRequest(config: ConnectorConfig): Promise<StepResult> {
+    const startTime = Date.now();
+
+    const response = await axios({
+      method: config.method as any,
+      url: config.url,
+      headers: config.headers,
+      data: config.body,
+      params: config.params,
+      timeout: config.timeout || 30000,
+      validateStatus: () => true,
+    });
+
+    const duration = Date.now() - startTime;
+
+    return this.createSuccessResult(
+      {
+        status: response.status,
+        statusText: response.statusText,
+        headers: response.headers,
+        data: response.data,
       },
-    };
+      {
+        duration,
+        url: config.url,
+        method: config.method,
+      }
+    );
   }
-
-  if (auth.type === 'bearer_token') {
-    return {
-      baseUrl: config.baseUrl,
-      auth: {
-        type: 'bearer_token',
-        token: decryptString(auth.encryptedToken),
-        tokenLast4: auth.tokenLast4,
-      },
-    };
-  }
-
-  return {
-    baseUrl: config.baseUrl,
-    auth: {
-      type: 'basic',
-      username: auth.username,
-      password: decryptString(auth.encryptedPassword),
-      passwordLast4: auth.passwordLast4,
-    },
-  };
 }
 
-export function getAuthHeaders(
-  config: DecryptedHttpConnectorInstanceConfig
-): Record<string, string> {
-  const auth = config.auth;
-
-  if (auth.type === 'none') return {};
-
-  if (auth.type === 'api_key') {
-    return {
-      [auth.headerName]: auth.apiKey,
-    };
-  }
-
-  if (auth.type === 'bearer_token') {
-    return {
-      Authorization: `Bearer ${auth.token}`,
-    };
-  }
-
-  const credentials = Buffer.from(`${auth.username}:${auth.password}`).toString(
-    'base64'
-  );
-
-  return {
-    Authorization: `Basic ${credentials}`,
-  };
-}
+export const httpConnector = new HttpConnector();

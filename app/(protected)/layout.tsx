@@ -45,6 +45,22 @@ export default async function ProtectedLayout({
               className="block rounded-md px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100"
             >
               Settings
+              href="/integrations"
+              className="block rounded-md px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100"
+            >
+              Integrations
+            </Link>
+            <Link
+              href="/monitoring"
+              className="block rounded-md px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100"
+            >
+              Monitoring
+            </Link>
+            <Link
+              href="/billing"
+              className="block rounded-md px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100"
+            >
+              Billing
             </Link>
             <Link
               href="/"

@@ -25,20 +25,23 @@ export async function POST(
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
-    const activeVersion = await workflowService.getActiveVersion(params.id);
-
-    if (!activeVersion) {
-      return NextResponse.json(
-        { error: 'No active version found' },
-        { status: 400 }
-      );
-    }
-
     const body = await request.json();
-    const { input } = body;
+    const { input, versionId } = body;
+
+    if (!versionId) {
+      const activeVersion = await workflowService.getActiveVersion(params.id);
+
+      if (!activeVersion) {
+        return NextResponse.json(
+          { error: 'No active version found' },
+          { status: 400 }
+        );
+      }
+    }
 
     const job = await addDispatchJob({
       workflowId: params.id,
+      versionId,
       input: input || {},
       metadata: {
         triggeredBy: 'manual',
