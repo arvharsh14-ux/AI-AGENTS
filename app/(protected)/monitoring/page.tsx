@@ -1,4 +1,39 @@
+'use client';
+
+import { useState, useEffect, useCallback } from 'react';
+import { useSession } from 'next-auth/react';
 import { ExecutionMonitor } from '@/components/workflows/execution-monitor';
+
+// Types based on the usage in the component
+interface Execution {
+  id: string;
+  workflowVersion: {
+    workflow: {
+      name: string;
+    };
+  };
+  steps: Array<{
+    id: string;
+    step: {
+      name: string;
+      type: string;
+    };
+    status: string;
+    durationMs?: number;
+  }>;
+  logs: Array<{
+    level: string;
+    timestamp: string;
+    message: string;
+  }>;
+}
+
+interface RealtimeMetrics {
+  activeExecutions: number;
+  completedExecutions: number;
+  failedExecutions: number;
+  averageDuration: number;
+}
 
 export default function MonitoringPage() {
   const { data: session } = useSession();
@@ -11,22 +46,8 @@ export default function MonitoringPage() {
   const [selectedExecution, setSelectedExecution] = useState<Execution | null>(null);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    loadData();
-    const interval = setInterval(loadMetrics, 5000); // Update metrics every 5 seconds
-    return () => clearInterval(interval);
-  }, [filters]);
-
-  async function loadData() {
-    setLoading(true);
-    try {
-      await Promise.all([loadExecutions(), loadMetrics()]);
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  async function loadExecutions() {
+  // Load executions function
+  const loadExecutions = useCallback(async () => {
     const params = new URLSearchParams();
     if (filters.status) params.append('status', filters.status);
     if (filters.workflowId) params.append('workflowId', filters.workflowId);
@@ -37,14 +58,31 @@ export default function MonitoringPage() {
       const data = await res.json();
       setExecutions(data.executions);
     }
-  }
+  }, [filters]);
 
-  async function loadMetrics() {
+  // Load metrics function
+  const loadMetrics = useCallback(async () => {
     const res = await fetch('/api/metrics?realtime=true');
     if (res.ok) {
       setMetrics(await res.json());
     }
-  }
+  }, []);
+
+  // Load data function wrapped in useCallback to stabilize dependency
+  const loadData = useCallback(async () => {
+    setLoading(true);
+    try {
+      await Promise.all([loadExecutions(), loadMetrics()]);
+    } finally {
+      setLoading(false);
+    }
+  }, [loadExecutions, loadMetrics]);
+
+  useEffect(() => {
+    loadData();
+    const interval = setInterval(loadMetrics, 5000); // Update metrics every 5 seconds
+    return () => clearInterval(interval);
+  }, [loadData, loadMetrics]);
 
   async function handleExport(format: 'csv' | 'json') {
     const params = new URLSearchParams();

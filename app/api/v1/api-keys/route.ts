@@ -68,13 +68,13 @@ export async function POST(request: NextRequest) {
     });
 
     return NextResponse.json({
-      id: apiKey.id,
-      name: apiKey.name,
+      id: (apiKey as any).id,
+      name: (apiKey as any).name,
       key: apiKey.plainKey,
-      keyPrefix: apiKey.keyPrefix,
-      permissions: apiKey.permissions,
-      expiresAt: apiKey.expiresAt,
-      createdAt: apiKey.createdAt,
+      keyPrefix: (apiKey as any).keyPrefix,
+      permissions: (apiKey as any).permissions,
+      expiresAt: (apiKey as any).expiresAt,
+      createdAt: (apiKey as any).createdAt,
       warning: 'Save this API key now. You will not be able to see it again.',
     }, { status: 201 });
   } catch (error: any) {

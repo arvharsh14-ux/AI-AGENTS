@@ -21,7 +21,7 @@ export async function GET(
 
   // Don't return full keys
   return NextResponse.json(
-    apiKeys.map((key) => ({
+    apiKeys.map((key: any) => ({
       ...key,
       key: `${key.key.substring(0, 8)}...${key.key.substring(key.key.length - 4)}`,
     }))

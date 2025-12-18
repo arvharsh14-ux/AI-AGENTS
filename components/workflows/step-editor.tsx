@@ -97,7 +97,7 @@ export function StepEditor({ step: initialStep, previousSteps = [], onSave, onCa
                   }
                 >
                   <option value="">None</option>
-                  {connectors.map((c) => (
+                  {[] /* TODO: connectors */.map((c: any) => (
                     <option key={c.id} value={c.id}>
                       {c.name}
                     </option>

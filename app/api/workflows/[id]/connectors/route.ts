@@ -67,7 +67,7 @@ export async function GET(
       orderBy: { createdAt: 'asc' },
     });
 
-    const publicConnectors = connectors.map((c) => ({
+    const publicConnectors = connectors.map((c: any) => ({
       id: c.id,
       name: c.name,
       connectorType: c.connectorType,

@@ -12,7 +12,7 @@ export async function GET(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const workflow = await workflowService.findById(params.id);
+    const workflow = await workflowService.getWorkflow(params.id);
 
     if (!workflow) {
       return NextResponse.json({ error: 'Workflow not found' }, { status: 404 });
@@ -42,7 +42,7 @@ export async function PATCH(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const workflow = await workflowService.findById(params.id);
+    const workflow = await workflowService.getWorkflow(params.id);
 
     if (!workflow) {
       return NextResponse.json({ error: 'Workflow not found' }, { status: 404 });
@@ -53,7 +53,7 @@ export async function PATCH(
     }
 
     const body = await request.json();
-    const updated = await workflowService.update(params.id, body);
+    const updated = await workflowService.updateWorkflow(params.id, body);
 
     return NextResponse.json(updated);
   } catch (error: any) {
@@ -75,7 +75,7 @@ export async function DELETE(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const workflow = await workflowService.findById(params.id);
+    const workflow = await workflowService.getWorkflow(params.id);
 
     if (!workflow) {
       return NextResponse.json({ error: 'Workflow not found' }, { status: 404 });
@@ -85,7 +85,7 @@ export async function DELETE(
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
-    await workflowService.delete(params.id);
+    await workflowService.deleteWorkflow(params.id);
 
     return NextResponse.json({ success: true });
   } catch (error: any) {

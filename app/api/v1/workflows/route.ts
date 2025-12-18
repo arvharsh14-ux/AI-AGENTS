@@ -22,7 +22,7 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const workflows = await workflowService.findByUser(auth.userId);
+    const workflows = await workflowService.listWorkflows(auth.userId);
 
     return NextResponse.json(workflows, { headers: rateLimit.headers });
   } catch (error: any) {
@@ -63,7 +63,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const workflow = await workflowService.create({
+    const workflow = await workflowService.createWorkflow({
       name,
       description,
       userId: auth.userId,
