@@ -100,3 +100,28 @@ export interface CustomCodeConfig {
   code: string;
   timeout?: number;
 }
+
+// Database model types
+export interface Workflow {
+  id: string;
+  name: string;
+  description?: string;
+  userId: string;
+  isPublic: boolean;
+  rateLimitMaxConcurrent?: number;
+  rateLimitPerMinute?: number;
+  retryMaxAttempts: number;
+  retryBackoffMs: number;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface WorkflowVersion {
+  id: string;
+  workflowId: string;
+  version: number;
+  definition: any; // Json type from Prisma
+  isActive: boolean;
+  publishedAt?: Date;
+  createdAt: Date;
+}

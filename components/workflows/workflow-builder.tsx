@@ -1,6 +1,6 @@
 'use client';
 
-import type { Workflow, WorkflowVersion } from '@prisma/client';
+import type { Workflow, WorkflowVersion } from '@/lib/types/workflow.types';
 import { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import type { WorkflowDefinition, StepDefinition } from '@/lib/types/workflow.types';

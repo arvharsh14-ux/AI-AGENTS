@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogTrigger, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
-import type { Workflow, WorkflowVersion } from '@prisma/client';
+import type { Workflow, WorkflowVersion } from '@/lib/types/workflow.types';
 
 interface WorkflowWithRelations extends Workflow {
   versions: WorkflowVersion[];
