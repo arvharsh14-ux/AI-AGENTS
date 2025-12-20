@@ -1,9 +1,8 @@
 'use client';
 
-import type { Workflow, WorkflowVersion } from '@/lib/types/workflow.types';
 import { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
-import type { WorkflowDefinition, StepDefinition } from '@/lib/types/workflow.types';
+import type { WorkflowDefinition, StepDefinition, Workflow, WorkflowVersion } from '@/lib/types/workflow.types';
 
 import { StepLibrary } from './step-library';
 import { StepEditor } from './step-editor';
