@@ -1,4 +1,17 @@
-import type { Subscription } from '@prisma/client';
+// Define Subscription type locally
+interface Subscription {
+  id: string;
+  userId: string;
+  stripeCustomerId?: string | null;
+  stripeSubscriptionId?: string | null;
+  stripePriceId?: string | null;
+  status: string; // 'active', 'trialing', 'past_due', 'canceled', 'unpaid', 'inactive'
+  currentPeriodStart?: Date | null;
+  currentPeriodEnd?: Date | null;
+  cancelAtPeriodEnd: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+}
 
 export type PlanTier = 'free' | 'pro';
 
