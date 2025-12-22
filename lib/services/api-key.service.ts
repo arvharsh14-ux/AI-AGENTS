@@ -5,7 +5,7 @@ import type { ApiKey } from '@prisma/client';
 export interface CreateApiKeyInput {
   workspaceId: string;
   name: string;
-  permissions: Record<string, any>;
+  role: string;
   expiresAt?: Date;
   createdBy: string;
 }
@@ -16,17 +16,15 @@ export interface ApiKeyWithSecret extends ApiKey {
 
 export class ApiKeyService {
   async create(input: CreateApiKeyInput): Promise<ApiKeyWithSecret> {
-    const { key, hash, prefix } = generateApiKey('sk');
+    const { key } = generateApiKey();
     
     const apiKey = await prisma.apiKey.create({
       data: {
         workspaceId: input.workspaceId,
         name: input.name,
-        keyHash: hash,
-        keyPrefix: prefix,
-        permissions: input.permissions as any,
+        key: key,
+        role: input.role,
         expiresAt: input.expiresAt,
-        createdBy: input.createdBy,
       },
     });
 
@@ -38,7 +36,7 @@ export class ApiKeyService {
 
   async findByHash(keyHash: string): Promise<ApiKey | null> {
     return prisma.apiKey.findUnique({
-      where: { keyHash },
+      where: { key: keyHash },
       include: {
         workspace: true,
       },
@@ -53,8 +51,12 @@ export class ApiKeyService {
   }
 
   async verify(key: string): Promise<ApiKey | null> {
-    const hash = hashApiKey(key);
-    const apiKey = await this.findByHash(hash);
+    const apiKey = await prisma.apiKey.findUnique({
+      where: { key },
+      include: {
+        workspace: true,
+      },
+    });
     
     if (!apiKey) {
       return null;
@@ -66,7 +68,10 @@ export class ApiKeyService {
 
     await prisma.apiKey.update({
       where: { id: apiKey.id },
-      data: { lastUsedAt: new Date() },
+      data: { 
+        lastUsedAt: new Date(),
+        usageCount: { increment: 1 }
+      },
     });
 
     return apiKey;

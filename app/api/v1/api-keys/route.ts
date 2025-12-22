@@ -24,10 +24,10 @@ export async function GET(request: NextRequest) {
     const sanitized = apiKeys.map((key) => ({
       id: key.id,
       name: key.name,
-      keyPrefix: key.keyPrefix,
-      permissions: key.permissions,
+      role: key.role,
       expiresAt: key.expiresAt,
       lastUsedAt: key.lastUsedAt,
+      usageCount: key.usageCount,
       createdAt: key.createdAt,
     }));
 
@@ -50,7 +50,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { workspaceId, name, permissions, expiresAt } = body;
+    const { workspaceId, name, role, expiresAt } = body;
 
     if (!workspaceId || !name) {
       return NextResponse.json(
@@ -62,19 +62,18 @@ export async function POST(request: NextRequest) {
     const apiKey = await apiKeyService.create({
       workspaceId,
       name,
-      permissions: permissions || { admin: true },
+      role: role || 'viewer',
       expiresAt: expiresAt ? new Date(expiresAt) : undefined,
       createdBy: session.user.id,
     });
 
     return NextResponse.json({
-      id: (apiKey as any).id,
-      name: (apiKey as any).name,
+      id: apiKey.id,
+      name: apiKey.name,
       key: apiKey.plainKey,
-      keyPrefix: (apiKey as any).keyPrefix,
-      permissions: (apiKey as any).permissions,
-      expiresAt: (apiKey as any).expiresAt,
-      createdAt: (apiKey as any).createdAt,
+      role: apiKey.role,
+      expiresAt: apiKey.expiresAt,
+      createdAt: apiKey.createdAt,
       warning: 'Save this API key now. You will not be able to see it again.',
     }, { status: 201 });
   } catch (error: any) {
