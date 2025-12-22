@@ -105,11 +105,11 @@ export interface CustomCodeConfig {
 export interface Workflow {
   id: string;
   name: string;
-  description?: string;
+  description: string | null;
   userId: string;
   isPublic: boolean;
-  rateLimitMaxConcurrent?: number;
-  rateLimitPerMinute?: number;
+  rateLimitMaxConcurrent: number | null;
+  rateLimitPerMinute: number | null;
   retryMaxAttempts: number;
   retryBackoffMs: number;
   createdAt: Date;
@@ -122,6 +122,6 @@ export interface WorkflowVersion {
   version: number;
   definition: any; // Json type from Prisma
   isActive: boolean;
-  publishedAt?: Date;
+  publishedAt: Date | null;
   createdAt: Date;
 }
