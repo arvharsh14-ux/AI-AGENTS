@@ -26,6 +26,7 @@ model User {
   workflows     Workflow[]
   subscriptions Subscription[]
   workspaceMembers WorkspaceMember[]
+  userApiKeys   UserApiKey[]
 
   @@map("users")
 }
@@ -115,6 +116,21 @@ model ApiKey {
 
   @@index([workspaceId])
   @@map("api_keys")
+}
+
+model UserApiKey {
+  id         String   @id @default(cuid())
+  userId     String
+  name       String
+  hashedKey  String   @unique
+  last4      String
+  createdAt  DateTime @default(now())
+  revokedAt  DateTime?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("user_api_keys")
 }
 
 model ApiKeyUsage {
