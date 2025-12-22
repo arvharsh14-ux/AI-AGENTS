@@ -54,6 +54,8 @@ export interface ExecutionContext {
   input: Record<string, any>;
   variables: Record<string, any>;
   metadata: Record<string, any>;
+  userId?: string;
+  workspaceId?: string;
 }
 
 export interface StepResult {

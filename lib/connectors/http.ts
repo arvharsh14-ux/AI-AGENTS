@@ -3,7 +3,8 @@ import { BaseConnector, ConnectorAction, ConnectorConfig } from './base-connecto
 import { interpolateVariables } from '@/lib/workflow/interpolation';
 import type { ExecutionContext, StepResult } from '@/lib/types/workflow.types';
 import type { HttpConnectorInstanceConfig } from './http.types';
-import { encrypt, hashApiKey } from '@/lib/encryption';
+import { encryptString } from '@/lib/security/encryption';
+import { hashApiKey } from '@/lib/encryption';
 
 export class HttpConnector extends BaseConnector {
   readonly type = 'http';
@@ -129,7 +130,7 @@ export function createHttpConnectorConfig(
 
   switch (auth.type) {
     case 'api_key': {
-      const encryptedApiKey = encrypt(auth.apiKey);
+      const encryptedApiKey = encryptString(auth.apiKey);
       return {
         baseUrl,
         auth: {
@@ -142,7 +143,7 @@ export function createHttpConnectorConfig(
     }
 
     case 'bearer_token': {
-      const encryptedToken = encrypt(auth.token);
+      const encryptedToken = encryptString(auth.token);
       return {
         baseUrl,
         auth: {
@@ -154,7 +155,7 @@ export function createHttpConnectorConfig(
     }
 
     case 'basic': {
-      const encryptedPassword = encrypt(auth.password);
+      const encryptedPassword = encryptString(auth.password);
       return {
         baseUrl,
         auth: {

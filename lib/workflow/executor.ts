@@ -63,13 +63,15 @@ export class WorkflowExecutor {
       emitExecutionEvent(executionId, 'started', { executionId });
 
       const context: ExecutionContext = {
-        executionId,
-        workflowId: execution.workflowVersion.workflowId,
-        versionId: execution.workflowVersionId,
-        input: (execution.input || {}) as Record<string, any>,
-        variables: {},
-        metadata: {},
-      };
+            executionId,
+            workflowId: execution.workflowVersion.workflowId,
+            versionId: execution.workflowVersionId,
+            input: (execution.input || {}) as Record<string, any>,
+            variables: {},
+            metadata: {},
+            userId: execution.workflowVersion.workflow.userId,
+            workspaceId: execution.workflowVersion.workflow.workspaceId,
+          };
 
       const steps = execution.workflowVersion.steps;
       
