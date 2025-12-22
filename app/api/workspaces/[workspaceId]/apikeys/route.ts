@@ -14,7 +14,7 @@ export async function GET(
 
   await requirePermission(session.user.id, workspaceId, 'apikey:read');
 
-  const apiKeys = await prisma.aPIKey.findMany({
+  const apiKeys = await prisma.apiKey.findMany({
     where: { workspaceId },
     orderBy: { createdAt: 'desc' },
   });
@@ -43,7 +43,7 @@ export async function POST(
   // Generate secure API key
   const key = `sk_${crypto.randomBytes(32).toString('hex')}`;
 
-  const apiKey = await prisma.aPIKey.create({
+  const apiKey = await prisma.apiKey.create({
     data: {
       key,
       name,

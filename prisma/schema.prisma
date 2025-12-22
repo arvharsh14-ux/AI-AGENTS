@@ -34,6 +34,8 @@ model Workspace {
   id            String   @id @default(cuid())
   name          String
   slug          String   @unique
+  ownerId       String   // Integration layer compatibility
+  settings      Json?
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
   
@@ -44,9 +46,19 @@ model Workspace {
   stripeCustomerId     String?   @unique
   stripeSubscriptionId String?   @unique
 
+  // Integration layer relationships
   members       Membership[]
-  apiKeys       APIKey[]
   invites       WorkspaceInvite[]
+  credentials   Credential[]
+  connectors    Connector[]
+  webhooks      Webhook[]
+  auditLogs     AuditLog[]
+  usageRecords  UsageRecord[]
+  alertRules    AlertRule[]
+  alertChannels AlertChannel[]
+  executionMetrics ExecutionMetrics[]
+  
+  apiKeys       ApiKey[]
   
   // Optional: Workflows can belong to a workspace
   // workflows     Workflow[]
@@ -87,7 +99,7 @@ model WorkspaceInvite {
   @@map("workspace_invites")
 }
 
-model APIKey {
+model ApiKey {
   id          String    @id @default(cuid())
   key         String    @unique
   name        String?
@@ -335,6 +347,215 @@ model Subscription {
 
   @@index([userId])
   @@map("subscriptions")
+}
+
+// Integration layer models
+model Credential {
+  id             String   @id @default(cuid())
+  workspaceId    String
+  name           String
+  description    String?
+  type           String
+  provider       String?
+  encryptedData  String
+  metadata       Json?
+  lastRotatedAt  DateTime?
+  rotationPolicy Json?
+  expiresAt      DateTime?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  createdBy      String
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  connectors Connector[]
+
+  @@index([workspaceId])
+  @@map("credentials")
+}
+
+model Connector {
+  id           String   @id @default(cuid())
+  workspaceId  String
+  name         String
+  type         String
+  description  String?
+  config       Json
+  credentialId String?
+  enabled      Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  workspace  Workspace   @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  credential Credential? @relation(fields: [credentialId], references: [id], onDelete: SetNull)
+
+  @@index([workspaceId])
+  @@index([type])
+  @@index([credentialId])
+  @@map("connectors")
+}
+
+model Webhook {
+  id             String   @id @default(cuid())
+  workspaceId    String
+  name           String
+  description    String?
+  url            String
+  secret         String?
+  events         Json
+  headers        Json?
+  retryPolicy    Json?
+  enabled        Boolean  @default(true)
+  lastTriggeredAt DateTime?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  deliveries WebhookDelivery[]
+
+  @@index([workspaceId])
+  @@map("webhooks")
+}
+
+model WebhookDelivery {
+  id           String   @id @default(cuid())
+  webhookId    String
+  eventType    String
+  payload      Json
+  request      Json?
+  response     Json?
+  status       String   @default("pending") // pending, delivered, failed
+  attemptCount Int      @default(0)
+  lastAttemptAt DateTime?
+  nextRetryAt  DateTime?
+  error        String?
+  createdAt    DateTime @default(now())
+
+  webhook Webhook @relation(fields: [webhookId], references: [id], onDelete: Cascade)
+
+  @@index([webhookId])
+  @@index([status])
+  @@index([createdAt])
+  @@map("webhook_deliveries")
+}
+
+model AuditLog {
+  id          String   @id @default(cuid())
+  workspaceId String
+  userId      String?
+  action      String
+  entityType  String   // what type of entity was affected
+  entityId    String?  // id of the affected entity
+  metadata    Json?
+  ipAddress   String?
+  userAgent   String?
+  timestamp   DateTime @default(now())
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId])
+  @@index([userId])
+  @@index([timestamp])
+  @@map("audit_logs")
+}
+
+model UsageRecord {
+  id            String   @id @default(cuid())
+  workspaceId   String
+  date          DateTime
+  executionCount Int     @default(0)
+  runMinutes    Float    @default(0)
+  connectorCount Int     @default(0)
+  workflowCount  Int     @default(0)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@unique([workspaceId, date])
+  @@index([workspaceId])
+  @@index([date])
+  @@map("usage_records")
+}
+
+model AlertRule {
+  id          String   @id @default(cuid())
+  workspaceId String
+  name        String
+  type        String
+  enabled     Boolean  @default(true)
+  conditions  Json
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  workspace     Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  notifications AlertNotification[]
+
+  @@index([workspaceId])
+  @@map("alert_rules")
+}
+
+model AlertChannel {
+  id          String   @id @default(cuid())
+  workspaceId String
+  type        String
+  name        String
+  config      Json
+  enabled     Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  workspace     Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  notifications AlertNotification[]
+
+  @@index([workspaceId])
+  @@map("alert_channels")
+}
+
+model AlertNotification {
+  id             String   @id @default(cuid())
+  alertRuleId    String
+  alertChannelId String
+  status         String   @default("pending") // pending, sent, failed
+  message        String
+  sentAt         DateTime?
+  error          String?
+  createdAt      DateTime @default(now())
+
+  alertRule    AlertRule    @relation(fields: [alertRuleId], references: [id], onDelete: Cascade)
+  alertChannel AlertChannel @relation(fields: [alertChannelId], references: [id], onDelete: Cascade)
+
+  @@index([alertRuleId])
+  @@index([alertChannelId])
+  @@index([status])
+  @@map("alert_notifications")
+}
+
+model ExecutionMetrics {
+  id                  String   @id @default(cuid())
+  workspaceId         String?
+  userId              String?
+  date                DateTime
+  hour                Int?
+  totalExecutions     Int      @default(0)
+  successfulExecutions Int     @default(0)
+  failedExecutions    Int      @default(0)
+  totalDurationMs     BigInt   @default(0)
+  minDurationMs       Int?
+  maxDurationMs       Int?
+  avgDurationMs       Float?
+  p50DurationMs       Int?
+  p95DurationMs       Int?
+  p99DurationMs       Int?
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  workspace Workspace? @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@unique([workspaceId, userId, date, hour])
+  @@index([workspaceId])
+  @@index([userId])
+  @@index([date])
+  @@map("execution_metrics")
 }
 
 // This section removed to avoid duplicate models - using the first Workspace model defined above

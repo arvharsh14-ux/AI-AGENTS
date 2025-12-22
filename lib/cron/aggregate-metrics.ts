@@ -1,7 +1,6 @@
 import 'dotenv/config';
 import { aggregateExecutionMetrics } from '../services/metrics.service';
 import { prisma } from '../prisma';
-import { evaluateAlertRules } from '../services/alert.service';
 import { trackUsage } from '../services/usage.service';
 
 async function runAggregation() {
@@ -29,12 +28,6 @@ async function runAggregation() {
       await trackUsage(workspace.id);
     }
     console.log(`✅ Tracked usage for ${workspaces.length} workspaces`);
-
-    // Evaluate alert rules
-    for (const workspace of workspaces) {
-      await evaluateAlertRules(workspace.id);
-    }
-    console.log(`✅ Evaluated alert rules for ${workspaces.length} workspaces`);
 
   } catch (error) {
     console.error('Error during aggregation:', error);

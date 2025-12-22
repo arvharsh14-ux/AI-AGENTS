@@ -61,6 +61,7 @@ export async function POST(req: NextRequest) {
     data: {
       name,
       slug,
+      ownerId: session.user.id, // Integration layer requires ownerId
       billingPlanId: freePlan?.id,
       members: {
         create: {
