@@ -2,8 +2,8 @@ import axios from 'axios';
 import { BaseConnector, ConnectorAction, ConnectorConfig } from './base-connector';
 import { interpolateVariables } from '@/lib/workflow/interpolation';
 import type { ExecutionContext, StepResult } from '@/lib/types/workflow.types';
-import type { HttpConnectorInstanceConfig } from './http.types';
-import { encryptString } from '@/lib/security/encryption';
+import type { HttpConnectorInstanceConfig, DecryptedHttpConnectorInstanceConfig } from './http.types';
+import { encryptString, decryptString, isEncryptedPayload } from '@/lib/security/encryption';
 import { hashApiKey } from '@/lib/encryption';
 
 export class HttpConnector extends BaseConnector {
@@ -112,6 +112,53 @@ export class HttpConnector extends BaseConnector {
 }
 
 export const httpConnector = new HttpConnector();
+
+// Helper functions for HTTP connector
+export function getAuthHeaders(config: DecryptedHttpConnectorInstanceConfig): Record<string, string> {
+  const headers: Record<string, string> = {};
+
+  if (config.auth?.type === 'api_key') {
+    const headerName = (config.auth as any).headerName || 'X-API-Key';
+    headers[headerName] = (config.auth as any).apiKey || '';
+  } else if (config.auth?.type === 'bearer_token') {
+    headers['Authorization'] = `Bearer ${(config.auth as any).token || ''}`;
+  } else if (config.auth?.type === 'basic') {
+    const username = (config.auth as any).username || '';
+    const password = (config.auth as any).password || '';
+    const encoded = Buffer.from(`${username}:${password}`).toString('base64');
+    headers['Authorization'] = `Basic ${encoded}`;
+  }
+
+  return headers;
+}
+
+export function joinUrl(baseUrl: string, path: string): string {
+  const base = baseUrl.endsWith('/') ? baseUrl.slice(0, -1) : baseUrl;
+  const p = path.startsWith('/') ? path : `/${path}`;
+  return `${base}${p}`;
+}
+
+export function decryptHttpConnectorConfig(
+  config: HttpConnectorInstanceConfig
+): DecryptedHttpConnectorInstanceConfig {
+  const decryptedAuth = { ...config.auth } as any;
+
+  if (config.auth.type === 'api_key' && 'encryptedApiKey' in config.auth) {
+    const encrypted = (config.auth as any).encryptedApiKey;
+    decryptedAuth.apiKey = isEncryptedPayload(encrypted) ? decryptString(encrypted) : '';
+  } else if (config.auth.type === 'bearer_token' && 'encryptedToken' in config.auth) {
+    const encrypted = (config.auth as any).encryptedToken;
+    decryptedAuth.token = isEncryptedPayload(encrypted) ? decryptString(encrypted) : '';
+  } else if (config.auth.type === 'basic' && 'encryptedPassword' in config.auth) {
+    const encrypted = (config.auth as any).encryptedPassword;
+    decryptedAuth.password = isEncryptedPayload(encrypted) ? decryptString(encrypted) : '';
+  }
+
+  return {
+    baseUrl: config.baseUrl,
+    auth: decryptedAuth,
+  };
+}
 
 // Simplified input type for creating connector configs
 interface HttpConnectorConfigInput {
