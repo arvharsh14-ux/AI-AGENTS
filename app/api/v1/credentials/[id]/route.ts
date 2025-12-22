@@ -64,7 +64,7 @@ export async function PATCH(
     }
 
     const body = await request.json();
-    const updated = await credentialService.update(params.id, body, auth.userId);
+    const updated = await credentialService.update(params.id, body, 'api-key');
 
     return NextResponse.json({
       id: updated.id,
@@ -104,7 +104,7 @@ export async function DELETE(
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
-    await credentialService.delete(params.id, auth.userId);
+    await credentialService.delete(params.id, 'api-key');
 
     return NextResponse.json({ success: true });
   } catch (error: any) {

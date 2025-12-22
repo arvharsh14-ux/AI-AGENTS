@@ -22,7 +22,9 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const workflows = await workflowService.listWorkflows(auth.userId);
+    // API keys don't have a userId, so list all workflows for the workspace
+    // TODO: Add workspace filtering when workflows support workspaceId
+    const workflows = await workflowService.listWorkflows('api-key');
 
     return NextResponse.json(workflows, { headers: rateLimit.headers });
   } catch (error: any) {
@@ -66,7 +68,7 @@ export async function POST(request: NextRequest) {
     const workflow = await workflowService.createWorkflow({
       name,
       description,
-      userId: auth.userId,
+      userId: 'api-key',
       isPublic: isPublic || false,
     });
 

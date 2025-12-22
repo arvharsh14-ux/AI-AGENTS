@@ -4,8 +4,7 @@ import { apiKeyService } from '@/lib/services/api-key.service';
 export interface AuthContext {
   apiKeyId: string;
   workspaceId: string;
-  userId: string;
-  permissions: Record<string, any>;
+  role: string;
 }
 
 export async function verifyApiKey(request: NextRequest): Promise<AuthContext | null> {
@@ -27,8 +26,7 @@ export async function verifyApiKey(request: NextRequest): Promise<AuthContext | 
     return {
       apiKeyId: key.id,
       workspaceId: key.workspaceId,
-      userId: key.createdBy,
-      permissions: key.permissions as Record<string, any>,
+      role: key.role,
     };
   } catch (error) {
     console.error('Error verifying API key:', error);
@@ -37,9 +35,20 @@ export async function verifyApiKey(request: NextRequest): Promise<AuthContext | 
 }
 
 export function hasPermission(auth: AuthContext, permission: string): boolean {
-  if (auth.permissions.admin === true) {
+  // Admin role has all permissions
+  if (auth.role === 'admin') {
     return true;
   }
 
-  return auth.permissions[permission] === true;
+  // Editor role can modify resources
+  if (auth.role === 'editor' && !permission.includes('delete') && !permission.includes('admin')) {
+    return true;
+  }
+
+  // Viewer role can only read
+  if (auth.role === 'viewer' && permission.includes('read')) {
+    return true;
+  }
+
+  return false;
 }

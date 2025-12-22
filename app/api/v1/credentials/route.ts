@@ -61,7 +61,7 @@ export async function POST(request: NextRequest) {
       metadata,
       rotationPolicy,
       expiresAt: expiresAt ? new Date(expiresAt) : undefined,
-      createdBy: auth.userId,
+      createdBy: 'api-key',
     });
 
     return NextResponse.json({

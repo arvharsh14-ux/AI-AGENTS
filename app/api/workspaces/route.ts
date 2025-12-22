@@ -8,7 +8,7 @@ export async function GET(req: NextRequest) {
 
   const workspaces = await prisma.workspace.findMany({
     where: {
-      members: {
+      workspaceMembers: {
         some: {
           userId: session.user.id,
         },
@@ -16,7 +16,7 @@ export async function GET(req: NextRequest) {
     },
     include: {
       billingPlan: true,
-      members: {
+      workspaceMembers: {
         include: {
           user: {
             select: {
@@ -63,7 +63,7 @@ export async function POST(req: NextRequest) {
       slug,
       ownerId: session.user.id, // Integration layer requires ownerId
       billingPlanId: freePlan?.id,
-      members: {
+      workspaceMembers: {
         create: {
           userId: session.user.id,
           role: 'owner',
