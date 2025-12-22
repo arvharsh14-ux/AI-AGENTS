@@ -86,8 +86,9 @@ async function main() {
       data: {
         name: "Demo's Workspace",
         slug: 'demo-workspace',
+        ownerId: user.id,
         billingPlanId: billingPlan.id,
-        members: {
+        workspaceMembers: {
           create: {
             userId: user.id,
             role: 'owner',

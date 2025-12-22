@@ -104,7 +104,7 @@ export class WebhookService {
       throw new Error('Webhook is disabled');
     }
 
-    if (!webhook.events.includes(eventType)) {
+    if (!webhook.events || !Array.isArray(webhook.events) || !webhook.events.includes(eventType)) {
       throw new Error('Event type not subscribed');
     }
 

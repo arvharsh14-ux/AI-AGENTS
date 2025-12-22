@@ -35,7 +35,7 @@ export class WorkflowExecutor {
 
     // Check quota before executing
     const userId = execution.workflowVersion.workflow.userId;
-    const membership = await prisma.membership.findFirst({
+    const membership = await prisma.workspaceMember.findFirst({
       where: { userId },
       include: { workspace: true },
     });
@@ -70,7 +70,7 @@ export class WorkflowExecutor {
             variables: {},
             metadata: {},
             userId: execution.workflowVersion.workflow.userId,
-            workspaceId: execution.workflowVersion.workflow.workspaceId,
+            workspaceId: membership?.workspaceId || '',
           };
 
       const steps = execution.workflowVersion.steps;
