@@ -84,7 +84,7 @@ export async function DELETE(
 
   await requirePermission(session.user.id, workspaceId, 'apikey:delete');
 
-  await prisma.aPIKey.delete({
+  await prisma.apiKey.delete({
     where: { id: keyId },
   });
 

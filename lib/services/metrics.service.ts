@@ -75,16 +75,16 @@ export async function aggregateExecutionMetrics(
     await prisma.executionMetrics.upsert({
       where: {
         workspaceId_userId_date_hour: {
-          workspaceId: null,
+          workspaceId: undefined as any,
           userId,
           date: new Date(date.toISOString().split('T')[0]),
-          hour: hour ?? null,
+          hour: hour ?? undefined as any,
         },
       },
       create: {
         userId,
         date: new Date(date.toISOString().split('T')[0]),
-        hour: hour ?? null,
+        hour: hour ?? undefined,
         totalExecutions: successful + failed,
         successfulExecutions: successful,
         failedExecutions: failed,

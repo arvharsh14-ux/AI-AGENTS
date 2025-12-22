@@ -34,7 +34,7 @@ export async function getUserWorkspaceRole(
   userId: string,
   workspaceId: string
 ): Promise<Role | null> {
-  const membership = await prisma.membership.findUnique({
+  const membership = await prisma.workspaceMember.findUnique({
     where: {
       userId_workspaceId: {
         userId,
@@ -119,7 +119,7 @@ export async function acceptInvite(token: string, userId: string) {
   }
 
   // Create membership
-  await prisma.membership.create({
+  await prisma.workspaceMember.create({
     data: {
       userId,
       workspaceId: invite.workspaceId,
@@ -144,14 +144,14 @@ export async function removeMember(
   await requirePermission(removedById, workspaceId, 'member:remove');
 
   // Can't remove yourself if you're the only owner
-  const ownerCount = await prisma.membership.count({
+  const ownerCount = await prisma.workspaceMember.count({
     where: {
       workspaceId,
       role: 'owner',
     },
   });
 
-  const memberToRemove = await prisma.membership.findUnique({
+  const memberToRemove = await prisma.workspaceMember.findUnique({
     where: {
       userId_workspaceId: {
         userId,
@@ -164,7 +164,7 @@ export async function removeMember(
     throw new Error('Cannot remove the last owner');
   }
 
-  await prisma.membership.delete({
+  await prisma.workspaceMember.delete({
     where: {
       userId_workspaceId: {
         userId,
@@ -182,7 +182,7 @@ export async function updateMemberRole(
 ) {
   await requirePermission(updatedById, workspaceId, 'member:invite');
 
-  await prisma.membership.update({
+  await prisma.workspaceMember.update({
     where: {
       userId_workspaceId: {
         userId,

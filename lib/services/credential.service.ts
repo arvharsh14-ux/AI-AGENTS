@@ -49,7 +49,6 @@ export class CredentialService {
       action: 'create',
       resourceType: 'credential',
       resourceId: credential.id,
-      credentialId: credential.id,
       details: {
         name: credential.name,
         type: credential.type,
@@ -105,7 +104,6 @@ export class CredentialService {
       action: 'update',
       resourceType: 'credential',
       resourceId: id,
-      credentialId: id,
       details: { changes: Object.keys(input) },
     });
 
@@ -124,7 +122,6 @@ export class CredentialService {
       action: 'delete',
       resourceType: 'credential',
       resourceId: id,
-      credentialId: id,
       details: {
         name: credential.name,
         type: credential.type,
@@ -148,7 +145,6 @@ export class CredentialService {
       action: 'access',
       resourceType: 'credential',
       resourceId: id,
-      credentialId: id,
     });
 
     return decryptJSON(credential.encryptedData);
@@ -174,7 +170,6 @@ export class CredentialService {
       action: 'rotate',
       resourceType: 'credential',
       resourceId: id,
-      credentialId: id,
     });
 
     return updated;
@@ -182,7 +177,10 @@ export class CredentialService {
 
   async getAuditLogs(credentialId: string, limit: number = 100): Promise<AuditLog[]> {
     return prisma.auditLog.findMany({
-      where: { credentialId },
+      where: { 
+        entityType: 'credential',
+        entityId: credentialId 
+      },
       orderBy: { timestamp: 'desc' },
       take: limit,
     });
@@ -194,7 +192,6 @@ export class CredentialService {
     action: string;
     resourceType: string;
     resourceId: string;
-    credentialId?: string;
     details?: Record<string, any>;
     ipAddress?: string;
     userAgent?: string;
@@ -204,10 +201,9 @@ export class CredentialService {
         workspaceId: data.workspaceId,
         userId: data.userId,
         action: data.action,
-        resourceType: data.resourceType,
-        resourceId: data.resourceId,
-        credentialId: data.credentialId,
-        details: data.details as any,
+        entityType: data.resourceType,
+        entityId: data.resourceId,
+        metadata: data.details as any,
         ipAddress: data.ipAddress,
         userAgent: data.userAgent,
       },

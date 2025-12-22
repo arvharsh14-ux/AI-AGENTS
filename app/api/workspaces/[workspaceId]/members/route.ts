@@ -13,7 +13,7 @@ export async function GET(
 
   await requirePermission(session.user.id, workspaceId, 'member:read');
 
-  const members = await prisma.membership.findMany({
+  const members = await prisma.workspaceMember.findMany({
     where: { workspaceId },
     include: {
       user: {

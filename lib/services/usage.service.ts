@@ -5,7 +5,7 @@ export async function trackUsage(workspaceId: string) {
   today.setHours(0, 0, 0, 0);
 
   // Get workspace members
-  const members = await prisma.membership.findMany({
+  const members = await prisma.workspaceMember.findMany({
     where: { workspaceId },
     select: { userId: true },
   });
@@ -132,7 +132,7 @@ export async function checkQuota(workspaceId: string): Promise<{
   }
 
   // Check workflow count
-  const members = await prisma.membership.findMany({
+  const members = await prisma.workspaceMember.findMany({
     where: { workspaceId },
     select: { userId: true },
   });
@@ -179,7 +179,7 @@ export async function getCurrentUsage(workspaceId: string) {
   const totalExecutions = usageRecords.reduce((sum, r) => sum + r.executionCount, 0);
   const totalRunMinutes = usageRecords.reduce((sum, r) => sum + r.runMinutes, 0);
 
-  const members = await prisma.membership.findMany({
+  const members = await prisma.workspaceMember.findMany({
     where: { workspaceId },
   });
 
