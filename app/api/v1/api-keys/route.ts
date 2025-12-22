@@ -71,6 +71,7 @@ export async function POST(request: NextRequest) {
       id: apiKey.id,
       name: apiKey.name,
       key: apiKey.plainKey,
+      keyPrefix: apiKey.keyPrefix,
       role: apiKey.role,
       expiresAt: apiKey.expiresAt,
       createdAt: apiKey.createdAt,

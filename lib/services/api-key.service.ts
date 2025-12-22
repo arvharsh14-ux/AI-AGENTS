@@ -1,6 +1,5 @@
 import { prisma } from '@/lib/prisma';
 import { generateApiKey, hashApiKey } from '@/lib/encryption';
-import type { ApiKey } from '@prisma/client';
 
 export interface CreateApiKeyInput {
   workspaceId: string;
@@ -10,49 +9,101 @@ export interface CreateApiKeyInput {
   createdBy: string;
 }
 
-export interface ApiKeyWithSecret extends ApiKey {
-  plainKey?: string;
+export interface ApiKeyWithSecret {
+  id: string;
+  workspaceId: string;
+  name?: string;
+  role: string; // Using role instead of permissions to match existing schema
+  key: string; // This should be the hashed key from database
+  keyPrefix?: string; // Key prefix for display
+  expiresAt?: Date | null;
+  lastUsedAt?: Date | null;
+  usageCount: number;
+  createdAt: Date;
+  createdBy: string;
+  plainKey?: string; // The plain text key (only available on creation)
 }
 
 export class ApiKeyService {
   async create(input: CreateApiKeyInput): Promise<ApiKeyWithSecret> {
-    const { key } = generateApiKey();
+    const { key, hash, prefix } = generateApiKey();
     
     const apiKey = await prisma.apiKey.create({
       data: {
         workspaceId: input.workspaceId,
         name: input.name,
-        key: key,
+        key: hash, // Store the hash, not the plain key
         role: input.role,
         expiresAt: input.expiresAt,
       },
     });
 
     return {
-      ...apiKey,
-      plainKey: key,
+      id: apiKey.id,
+      workspaceId: apiKey.workspaceId,
+      name: apiKey.name || undefined,
+      role: apiKey.role,
+      key: apiKey.key, // This is the hash stored in DB
+      keyPrefix: prefix,
+      expiresAt: apiKey.expiresAt,
+      lastUsedAt: apiKey.lastUsedAt,
+      usageCount: apiKey.usageCount,
+      createdAt: apiKey.createdAt,
+      createdBy: input.createdBy,
+      plainKey: key, // Only return plain key to client
     };
   }
 
-  async findByHash(keyHash: string): Promise<ApiKey | null> {
-    return prisma.apiKey.findUnique({
+  async findByHash(keyHash: string): Promise<ApiKeyWithSecret | null> {
+    const apiKey = await prisma.apiKey.findUnique({
       where: { key: keyHash },
       include: {
         workspace: true,
       },
     });
+
+    if (!apiKey) return null;
+
+    return {
+      id: apiKey.id,
+      workspaceId: apiKey.workspaceId,
+      name: apiKey.name || undefined,
+      role: apiKey.role,
+      key: apiKey.key,
+      keyPrefix: (apiKey as any).keyPrefix, // KeyPrefix might not be in DB yet
+      expiresAt: apiKey.expiresAt,
+      lastUsedAt: apiKey.lastUsedAt,
+      usageCount: apiKey.usageCount,
+      createdAt: apiKey.createdAt,
+      createdBy: '', // This field isn't in the database schema, we don't have it
+    };
   }
 
-  async findByWorkspace(workspaceId: string): Promise<ApiKey[]> {
-    return prisma.apiKey.findMany({
+  async findByWorkspace(workspaceId: string): Promise<Omit<ApiKeyWithSecret, 'plainKey'>[]> {
+    const apiKeys = await prisma.apiKey.findMany({
       where: { workspaceId },
       orderBy: { createdAt: 'desc' },
     });
+
+    return apiKeys.map(apiKey => ({
+      id: apiKey.id,
+      workspaceId: apiKey.workspaceId,
+      name: apiKey.name || undefined,
+      role: apiKey.role,
+      key: apiKey.key,
+      keyPrefix: (apiKey as any).keyPrefix, // KeyPrefix might not be in DB yet
+      expiresAt: apiKey.expiresAt,
+      lastUsedAt: apiKey.lastUsedAt,
+      usageCount: apiKey.usageCount,
+      createdAt: apiKey.createdAt,
+      createdBy: '', // This field isn't in the database schema
+    }));
   }
 
-  async verify(key: string): Promise<ApiKey | null> {
+  async verify(key: string): Promise<ApiKeyWithSecret | null> {
+    const hash = hashApiKey(key);
     const apiKey = await prisma.apiKey.findUnique({
-      where: { key },
+      where: { key: hash },
       include: {
         workspace: true,
       },
@@ -74,7 +125,19 @@ export class ApiKeyService {
       },
     });
 
-    return apiKey;
+    return {
+      id: apiKey.id,
+      workspaceId: apiKey.workspaceId,
+      name: apiKey.name || undefined,
+      role: apiKey.role,
+      key: apiKey.key,
+      keyPrefix: (apiKey as any).keyPrefix, // KeyPrefix might not be in DB yet
+      expiresAt: apiKey.expiresAt,
+      lastUsedAt: apiKey.lastUsedAt,
+      usageCount: apiKey.usageCount,
+      createdAt: apiKey.createdAt,
+      createdBy: '', // This field isn't in the database schema
+    };
   }
 
   async delete(id: string): Promise<void> {
