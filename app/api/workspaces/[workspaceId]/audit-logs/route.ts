@@ -3,6 +3,8 @@ import { requireAuth } from '@/lib/auth-helpers';
 import { requirePermission } from '@/lib/services/rbac.service';
 import { getAuditLogs, exportAuditLogs } from '@/lib/services/audit.service';
 
+export const dynamic = 'force-dynamic';
+
 export async function GET(
   req: NextRequest,
   { params }: { params: { workspaceId: string } }

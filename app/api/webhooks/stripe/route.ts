@@ -3,6 +3,8 @@ import Stripe from 'stripe';
 import { stripe } from '@/lib/services/stripe.service';
 import { handleSubscriptionChange, handleSubscriptionDeleted } from '@/lib/services/stripe.service';
 
+export const dynamic = 'force-dynamic';
+
 export async function POST(req: NextRequest) {
   const body = await req.text();
   const sig = req.headers.get('stripe-signature');
