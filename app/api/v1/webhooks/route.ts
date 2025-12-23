@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { webhookService } from '@/lib/services/webhook.service';
 import { verifyApiKey } from '@/lib/middleware/auth';
 
+export const dynamic = 'force-dynamic';
+
 export async function GET(request: NextRequest) {
   try {
     const auth = await verifyApiKey(request);
