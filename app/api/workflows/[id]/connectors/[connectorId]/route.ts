@@ -40,6 +40,8 @@ function toPublicConfig(config: HttpConnectorInstanceConfig) {
   };
 }
 
+export const dynamic = 'force-dynamic';
+
 export async function PUT(
   request: NextRequest,
   { params }: { params: { id: string; connectorId: string } }

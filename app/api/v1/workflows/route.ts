@@ -1,7 +1,15 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { workflowService } from '@/lib/services/workflow.service';
+import { NextRequest } from 'next/server';
+
+import {
+  ApiError,
+  handleApiError,
+  jsonError,
+  jsonOk,
+  readJsonBody,
+} from '@/lib/api/route-helpers';
 import { verifyApiKey } from '@/lib/middleware/auth';
 import { rateLimitMiddleware } from '@/lib/middleware/rate-limit';
+import { workflowService } from '@/lib/services/workflow.service';
 
 export const dynamic = 'force-dynamic';
 
@@ -9,7 +17,7 @@ export async function GET(request: NextRequest) {
   try {
     const auth = await verifyApiKey(request);
     if (!auth) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return jsonError('Unauthorized', 401, 'UNAUTHORIZED');
     }
 
     const rateLimit = await rateLimitMiddleware(request, `api:${auth.apiKeyId}`, {
@@ -18,23 +26,16 @@ export async function GET(request: NextRequest) {
     });
 
     if (!rateLimit.allowed) {
-      return NextResponse.json(
-        { error: 'Rate limit exceeded' },
-        { status: 429, headers: rateLimit.headers }
-      );
+      return jsonError('Rate limit exceeded', 429, 'RATE_LIMITED', {
+        headers: rateLimit.headers,
+      });
     }
 
-    // API keys don't have a userId, so list all workflows for the workspace
-    // TODO: Add workspace filtering when workflows support workspaceId
     const workflows = await workflowService.listWorkflows('api-key');
 
-    return NextResponse.json(workflows, { headers: rateLimit.headers });
-  } catch (error: any) {
-    console.error('Error fetching workflows:', error);
-    return NextResponse.json(
-      { error: error.message || 'Internal server error' },
-      { status: 500 }
-    );
+    return jsonOk(workflows, { headers: rateLimit.headers });
+  } catch (error) {
+    return handleApiError(error, 'GET /api/v1/workflows');
   }
 }
 
@@ -42,7 +43,7 @@ export async function POST(request: NextRequest) {
   try {
     const auth = await verifyApiKey(request);
     if (!auth) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return jsonError('Unauthorized', 401, 'UNAUTHORIZED');
     }
 
     const rateLimit = await rateLimitMiddleware(request, `api:${auth.apiKeyId}`, {
@@ -51,20 +52,16 @@ export async function POST(request: NextRequest) {
     });
 
     if (!rateLimit.allowed) {
-      return NextResponse.json(
-        { error: 'Rate limit exceeded' },
-        { status: 429, headers: rateLimit.headers }
-      );
+      return jsonError('Rate limit exceeded', 429, 'RATE_LIMITED', {
+        headers: rateLimit.headers,
+      });
     }
 
-    const body = await request.json();
+    const body = await readJsonBody<any>(request);
     const { name, description, definition, isPublic } = body;
 
     if (!name) {
-      return NextResponse.json(
-        { error: 'Missing required field: name' },
-        { status: 400, headers: rateLimit.headers }
-      );
+      throw new ApiError('Missing required field: name', 400, 'VALIDATION_ERROR');
     }
 
     const workflow = await workflowService.createWorkflow({
@@ -78,12 +75,8 @@ export async function POST(request: NextRequest) {
       await workflowService.createVersion(workflow.id, definition);
     }
 
-    return NextResponse.json(workflow, { status: 201, headers: rateLimit.headers });
-  } catch (error: any) {
-    console.error('Error creating workflow:', error);
-    return NextResponse.json(
-      { error: error.message || 'Internal server error' },
-      { status: 500 }
-    );
+    return jsonOk(workflow, { status: 201, headers: rateLimit.headers });
+  } catch (error) {
+    return handleApiError(error, 'POST /api/v1/workflows');
   }
 }

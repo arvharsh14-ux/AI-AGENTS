@@ -4,6 +4,8 @@ import { authOptions } from '@/lib/auth';
 import { workflowService } from '@/lib/services/workflow.service';
 import { billingService } from '@/lib/services/billing.service';
 
+export const dynamic = 'force-dynamic';
+
 export async function GET(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions);

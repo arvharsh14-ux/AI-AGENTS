@@ -1,13 +1,23 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { connectorService } from '@/lib/services/connector.service';
+import { NextRequest } from 'next/server';
+
+import {
+  ApiError,
+  handleApiError,
+  jsonError,
+  jsonOk,
+  readJsonBody,
+} from '@/lib/api/route-helpers';
 import { connectorRegistry } from '@/lib/connectors';
 import { verifyApiKey } from '@/lib/middleware/auth';
+import { connectorService } from '@/lib/services/connector.service';
+
+export const dynamic = 'force-dynamic';
 
 export async function GET(request: NextRequest) {
   try {
     const auth = await verifyApiKey(request);
     if (!auth) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return jsonError('Unauthorized', 401, 'UNAUTHORIZED');
     }
 
     const searchParams = request.nextUrl.searchParams;
@@ -20,18 +30,14 @@ export async function GET(request: NextRequest) {
         description: connector.description,
         actions: connector.actions,
       }));
-      
-      return NextResponse.json(available);
+
+      return jsonOk(available);
     }
 
     const connectors = await connectorService.findByWorkspace(auth.workspaceId);
-    return NextResponse.json(connectors);
-  } catch (error: any) {
-    console.error('Error fetching connectors:', error);
-    return NextResponse.json(
-      { error: error.message || 'Internal server error' },
-      { status: 500 }
-    );
+    return jsonOk(connectors);
+  } catch (error) {
+    return handleApiError(error, 'GET /api/v1/connectors');
   }
 }
 
@@ -39,16 +45,17 @@ export async function POST(request: NextRequest) {
   try {
     const auth = await verifyApiKey(request);
     if (!auth) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return jsonError('Unauthorized', 401, 'UNAUTHORIZED');
     }
 
-    const body = await request.json();
+    const body = await readJsonBody<any>(request);
     const { name, type, description, config, credentialId } = body;
 
     if (!name || !type) {
-      return NextResponse.json(
-        { error: 'Missing required fields: name, type' },
-        { status: 400 }
+      throw new ApiError(
+        'Missing required fields: name, type',
+        400,
+        'VALIDATION_ERROR',
       );
     }
 
@@ -61,12 +68,8 @@ export async function POST(request: NextRequest) {
       credentialId,
     });
 
-    return NextResponse.json(connector, { status: 201 });
-  } catch (error: any) {
-    console.error('Error creating connector:', error);
-    return NextResponse.json(
-      { error: error.message || 'Internal server error' },
-      { status: 500 }
-    );
+    return jsonOk(connector, { status: 201 });
+  } catch (error) {
+    return handleApiError(error, 'POST /api/v1/connectors');
   }
 }

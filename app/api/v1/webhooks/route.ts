@@ -1,6 +1,14 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { webhookService } from '@/lib/services/webhook.service';
+import { NextRequest } from 'next/server';
+
+import {
+  ApiError,
+  handleApiError,
+  jsonError,
+  jsonOk,
+  readJsonBody,
+} from '@/lib/api/route-helpers';
 import { verifyApiKey } from '@/lib/middleware/auth';
+import { webhookService } from '@/lib/services/webhook.service';
 
 export const dynamic = 'force-dynamic';
 
@@ -8,17 +16,13 @@ export async function GET(request: NextRequest) {
   try {
     const auth = await verifyApiKey(request);
     if (!auth) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return jsonError('Unauthorized', 401, 'UNAUTHORIZED');
     }
 
     const webhooks = await webhookService.findByWorkspace(auth.workspaceId);
-    return NextResponse.json(webhooks);
-  } catch (error: any) {
-    console.error('Error fetching webhooks:', error);
-    return NextResponse.json(
-      { error: error.message || 'Internal server error' },
-      { status: 500 }
-    );
+    return jsonOk(webhooks);
+  } catch (error) {
+    return handleApiError(error, 'GET /api/v1/webhooks');
   }
 }
 
@@ -26,16 +30,17 @@ export async function POST(request: NextRequest) {
   try {
     const auth = await verifyApiKey(request);
     if (!auth) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return jsonError('Unauthorized', 401, 'UNAUTHORIZED');
     }
 
-    const body = await request.json();
+    const body = await readJsonBody<any>(request);
     const { name, description, url, events, headers, retryPolicy } = body;
 
     if (!name || !url || !events || !Array.isArray(events)) {
-      return NextResponse.json(
-        { error: 'Missing required fields: name, url, events' },
-        { status: 400 }
+      throw new ApiError(
+        'Missing required fields: name, url, events',
+        400,
+        'VALIDATION_ERROR',
       );
     }
 
@@ -49,12 +54,8 @@ export async function POST(request: NextRequest) {
       retryPolicy,
     });
 
-    return NextResponse.json(webhook, { status: 201 });
-  } catch (error: any) {
-    console.error('Error creating webhook:', error);
-    return NextResponse.json(
-      { error: error.message || 'Internal server error' },
-      { status: 500 }
-    );
+    return jsonOk(webhook, { status: 201 });
+  } catch (error) {
+    return handleApiError(error, 'POST /api/v1/webhooks');
   }
 }

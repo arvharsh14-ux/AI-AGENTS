@@ -1,28 +1,32 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { credentialService } from '@/lib/services/credential.service';
+import { NextRequest } from 'next/server';
+
+import { handleApiError, jsonError, jsonOk, readJsonBody } from '@/lib/api/route-helpers';
 import { verifyApiKey } from '@/lib/middleware/auth';
+import { credentialService } from '@/lib/services/credential.service';
+
+export const dynamic = 'force-dynamic';
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: { id: string } },
 ) {
   try {
     const auth = await verifyApiKey(request);
     if (!auth) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return jsonError('Unauthorized', 401, 'UNAUTHORIZED');
     }
 
     const credential = await credentialService.findById(params.id);
 
     if (!credential) {
-      return NextResponse.json({ error: 'Credential not found' }, { status: 404 });
+      return jsonError('Credential not found', 404, 'NOT_FOUND');
     }
 
     if (credential.workspaceId !== auth.workspaceId) {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+      return jsonError('Forbidden', 403, 'FORBIDDEN');
     }
 
-    return NextResponse.json({
+    return jsonOk({
       id: credential.id,
       name: credential.name,
       description: credential.description,
@@ -34,39 +38,35 @@ export async function GET(
       createdAt: credential.createdAt,
       updatedAt: credential.updatedAt,
     });
-  } catch (error: any) {
-    console.error('Error fetching credential:', error);
-    return NextResponse.json(
-      { error: error.message || 'Internal server error' },
-      { status: 500 }
-    );
+  } catch (error) {
+    return handleApiError(error, 'GET /api/v1/credentials/:id');
   }
 }
 
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: { id: string } },
 ) {
   try {
     const auth = await verifyApiKey(request);
     if (!auth) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return jsonError('Unauthorized', 401, 'UNAUTHORIZED');
     }
 
     const credential = await credentialService.findById(params.id);
 
     if (!credential) {
-      return NextResponse.json({ error: 'Credential not found' }, { status: 404 });
+      return jsonError('Credential not found', 404, 'NOT_FOUND');
     }
 
     if (credential.workspaceId !== auth.workspaceId) {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+      return jsonError('Forbidden', 403, 'FORBIDDEN');
     }
 
-    const body = await request.json();
+    const body = await readJsonBody<any>(request);
     const updated = await credentialService.update(params.id, body, 'api-key');
 
-    return NextResponse.json({
+    return jsonOk({
       id: updated.id,
       name: updated.name,
       description: updated.description,
@@ -75,43 +75,35 @@ export async function PATCH(
       metadata: updated.metadata,
       updatedAt: updated.updatedAt,
     });
-  } catch (error: any) {
-    console.error('Error updating credential:', error);
-    return NextResponse.json(
-      { error: error.message || 'Internal server error' },
-      { status: 500 }
-    );
+  } catch (error) {
+    return handleApiError(error, 'PATCH /api/v1/credentials/:id');
   }
 }
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: { id: string } },
 ) {
   try {
     const auth = await verifyApiKey(request);
     if (!auth) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return jsonError('Unauthorized', 401, 'UNAUTHORIZED');
     }
 
     const credential = await credentialService.findById(params.id);
 
     if (!credential) {
-      return NextResponse.json({ error: 'Credential not found' }, { status: 404 });
+      return jsonError('Credential not found', 404, 'NOT_FOUND');
     }
 
     if (credential.workspaceId !== auth.workspaceId) {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+      return jsonError('Forbidden', 403, 'FORBIDDEN');
     }
 
     await credentialService.delete(params.id, 'api-key');
 
-    return NextResponse.json({ success: true });
-  } catch (error: any) {
-    console.error('Error deleting credential:', error);
-    return NextResponse.json(
-      { error: error.message || 'Internal server error' },
-      { status: 500 }
-    );
+    return jsonOk({ success: true });
+  } catch (error) {
+    return handleApiError(error, 'DELETE /api/v1/credentials/:id');
   }
 }

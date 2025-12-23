@@ -4,7 +4,16 @@ import { useState, useOptimistic } from 'react';
 import Link from 'next/link';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Dialog, DialogTrigger, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/dialog';
 import type { Workflow, WorkflowVersion } from '@/lib/types/workflow.types';
 
 interface WorkflowWithRelations extends Workflow {
@@ -85,31 +94,34 @@ export function WorkflowsList({ workflows }: WorkflowsListProps) {
 
                   <Dialog>
                     <DialogTrigger asChild>
-                      <Button variant="ghost" size="sm">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="text-red-600 hover:bg-red-50 hover:text-red-700"
+                      >
                         Delete
                       </Button>
                     </DialogTrigger>
                     <DialogContent>
                       <DialogHeader>
-                        <DialogTitle>Delete Workflow</DialogTitle>
+                        <DialogTitle>Delete workflow</DialogTitle>
                         <DialogDescription>
                           Are you sure you want to delete &quot;{workflow.name}&quot;? This action cannot be undone.
                         </DialogDescription>
                       </DialogHeader>
                       <DialogFooter>
-                        <Button
-                          variant="secondary"
-                          onClick={() => setDeletingId(null)}
-                        >
-                          Cancel
-                        </Button>
-                        <Button
-                          variant="default"
-                          onClick={() => handleDelete(workflow.id)}
-                          disabled={deletingId === workflow.id}
-                        >
-                          {deletingId === workflow.id ? 'Deleting...' : 'Delete'}
-                        </Button>
+                        <DialogClose asChild>
+                          <Button variant="outline">Cancel</Button>
+                        </DialogClose>
+                        <DialogClose asChild>
+                          <Button
+                            variant="destructive"
+                            onClick={() => handleDelete(workflow.id)}
+                            disabled={deletingId === workflow.id}
+                          >
+                            {deletingId === workflow.id ? 'Deleting…' : 'Delete'}
+                          </Button>
+                        </DialogClose>
                       </DialogFooter>
                     </DialogContent>
                   </Dialog>

@@ -4,7 +4,7 @@ import { Slot } from '@radix-ui/react-slot';
 
 import { cn } from '@/lib/utils';
 
-type ButtonVariant = 'default' | 'secondary' | 'ghost' | 'outline';
+type ButtonVariant = 'default' | 'secondary' | 'ghost' | 'outline' | 'destructive';
 type ButtonSize = 'sm' | 'md' | 'lg';
 
 export type ButtonProps = React.ButtonHTMLAttributes<HTMLButtonElement> &
@@ -15,10 +15,15 @@ export type ButtonProps = React.ButtonHTMLAttributes<HTMLButtonElement> &
   };
 
 const variantClasses: Record<ButtonVariant, string> = {
-  default: 'bg-slate-900 text-white hover:bg-slate-800',
-  secondary: 'bg-slate-100 text-slate-900 hover:bg-slate-200',
-  ghost: 'bg-transparent text-slate-900 hover:bg-slate-100',
-  outline: 'border border-slate-300 bg-white text-slate-900 hover:bg-slate-50',
+  default:
+    'bg-indigo-600 text-white shadow-sm hover:bg-indigo-500 active:bg-indigo-600',
+  secondary:
+    'bg-slate-100 text-slate-900 shadow-sm hover:bg-slate-200 active:bg-slate-200',
+  ghost: 'bg-transparent text-slate-900 hover:bg-slate-100 active:bg-slate-100',
+  outline:
+    'border border-slate-300 bg-white text-slate-900 shadow-sm hover:bg-slate-50 active:bg-slate-50',
+  destructive:
+    'bg-red-600 text-white shadow-sm hover:bg-red-500 active:bg-red-600 focus-visible:ring-red-500',
 };
 
 const sizeClasses: Record<ButtonSize, string> = {
@@ -38,7 +43,7 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
       <Comp
         ref={ref}
         className={cn(
-          'inline-flex items-center justify-center whitespace-nowrap rounded-md font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 disabled:pointer-events-none disabled:opacity-50',
+          'inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 ring-offset-slate-50 disabled:pointer-events-none disabled:opacity-50',
           variantClasses[variant],
           sizeClasses[size],
           className,

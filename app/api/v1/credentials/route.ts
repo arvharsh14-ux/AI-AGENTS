@@ -1,12 +1,22 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { credentialService } from '@/lib/services/credential.service';
+import { NextRequest } from 'next/server';
+
+import {
+  ApiError,
+  handleApiError,
+  jsonError,
+  jsonOk,
+  readJsonBody,
+} from '@/lib/api/route-helpers';
 import { verifyApiKey } from '@/lib/middleware/auth';
+import { credentialService } from '@/lib/services/credential.service';
+
+export const dynamic = 'force-dynamic';
 
 export async function GET(request: NextRequest) {
   try {
     const auth = await verifyApiKey(request);
     if (!auth) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return jsonError('Unauthorized', 401, 'UNAUTHORIZED');
     }
 
     const credentials = await credentialService.findByWorkspace(auth.workspaceId);
@@ -24,13 +34,9 @@ export async function GET(request: NextRequest) {
       updatedAt: cred.updatedAt,
     }));
 
-    return NextResponse.json(sanitized);
-  } catch (error: any) {
-    console.error('Error fetching credentials:', error);
-    return NextResponse.json(
-      { error: error.message || 'Internal server error' },
-      { status: 500 }
-    );
+    return jsonOk(sanitized);
+  } catch (error) {
+    return handleApiError(error, 'GET /api/v1/credentials');
   }
 }
 
@@ -38,16 +44,26 @@ export async function POST(request: NextRequest) {
   try {
     const auth = await verifyApiKey(request);
     if (!auth) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return jsonError('Unauthorized', 401, 'UNAUTHORIZED');
     }
 
-    const body = await request.json();
-    const { name, description, type, provider, data, metadata, rotationPolicy, expiresAt } = body;
+    const body = await readJsonBody<any>(request);
+    const {
+      name,
+      description,
+      type,
+      provider,
+      data,
+      metadata,
+      rotationPolicy,
+      expiresAt,
+    } = body;
 
     if (!name || !type || !data) {
-      return NextResponse.json(
-        { error: 'Missing required fields: name, type, data' },
-        { status: 400 }
+      throw new ApiError(
+        'Missing required fields: name, type, data',
+        400,
+        'VALIDATION_ERROR',
       );
     }
 
@@ -64,20 +80,19 @@ export async function POST(request: NextRequest) {
       createdBy: 'api-key',
     });
 
-    return NextResponse.json({
-      id: credential.id,
-      name: credential.name,
-      description: credential.description,
-      type: credential.type,
-      provider: credential.provider,
-      metadata: credential.metadata,
-      createdAt: credential.createdAt,
-    }, { status: 201 });
-  } catch (error: any) {
-    console.error('Error creating credential:', error);
-    return NextResponse.json(
-      { error: error.message || 'Internal server error' },
-      { status: 500 }
+    return jsonOk(
+      {
+        id: credential.id,
+        name: credential.name,
+        description: credential.description,
+        type: credential.type,
+        provider: credential.provider,
+        metadata: credential.metadata,
+        createdAt: credential.createdAt,
+      },
+      { status: 201 },
     );
+  } catch (error) {
+    return handleApiError(error, 'POST /api/v1/credentials');
   }
 }

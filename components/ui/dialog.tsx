@@ -72,6 +72,39 @@ export function DialogTrigger({
   );
 }
 
+export function DialogClose({
+  asChild,
+  children,
+  ...props
+}: {
+  asChild?: boolean;
+  children: React.ReactNode;
+} & React.ButtonHTMLAttributes<HTMLButtonElement>) {
+  const { setIsOpen } = useDialog();
+
+  if (asChild && React.isValidElement(children)) {
+    return React.cloneElement(children as React.ReactElement<any>, {
+      ...props,
+      onClick: (event: React.MouseEvent<HTMLButtonElement>) => {
+        props.onClick?.(event);
+        setIsOpen(false);
+      },
+    });
+  }
+
+  return (
+    <button
+      {...props}
+      onClick={(event) => {
+        props.onClick?.(event);
+        setIsOpen(false);
+      }}
+    >
+      {children}
+    </button>
+  );
+}
+
 export function DialogContent({
   children,
   className,

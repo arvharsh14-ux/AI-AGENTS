@@ -1,6 +1,12 @@
-import { NextResponse } from 'next/server';
+import { handleApiError, jsonOk } from '@/lib/api/route-helpers';
 import { postmanCollection } from '@/lib/openapi/postman-collection';
 
+export const dynamic = 'force-dynamic';
+
 export async function GET() {
-  return NextResponse.json(postmanCollection);
+  try {
+    return jsonOk(postmanCollection);
+  } catch (error) {
+    return handleApiError(error, 'GET /api/v1/postman');
+  }
 }
