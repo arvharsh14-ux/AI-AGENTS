@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma';
 import { verifyStripeWebhookSignature } from '@/lib/billing/stripe';
 
 export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
 
 export async function POST(request: NextRequest) {
   const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;

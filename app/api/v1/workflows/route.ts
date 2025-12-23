@@ -3,6 +3,8 @@ import { workflowService } from '@/lib/services/workflow.service';
 import { verifyApiKey } from '@/lib/middleware/auth';
 import { rateLimitMiddleware } from '@/lib/middleware/rate-limit';
 
+export const dynamic = 'force-dynamic';
+
 export async function GET(request: NextRequest) {
   try {
     const auth = await verifyApiKey(request);
