@@ -4,6 +4,8 @@ import { authOptions } from '@/lib/auth';
 import { workflowService } from '@/lib/services/workflow.service';
 import { triggerService } from '@/lib/services/trigger.service';
 
+export const dynamic = 'force-dynamic';
+
 export async function GET(
   request: NextRequest,
   { params }: { params: { id: string } }

@@ -1,16 +1,15 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { io, type Socket } from 'socket.io-client';
+
 import { Button } from '@/components/ui/button';
+import { Spinner } from '@/components/ui/spinner';
 import { Textarea } from '@/components/ui/textarea';
-import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import { io, Socket } from 'socket.io-client';
-import { WorkflowDefinition } from '@/lib/types/workflow.types';
 
 interface TestPanelProps {
   workflowId: string;
-  onRunTest: (input: any) => Promise<string | null>; // Returns executionId
+  onRunTest: (input: any) => Promise<string | null>; // Returns jobId
 }
 
 interface LogEntry {
@@ -20,25 +19,22 @@ interface LogEntry {
   details?: any;
 }
 
-export function TestPanel({ workflowId, onRunTest }: TestPanelProps) {
-  const [input, setInput] = useState('{\n  "test": true\n}');
+export function TestPanel({ onRunTest }: TestPanelProps) {
+  const [input, setInput] = useState('{
+  "test": true
+}');
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [isRunning, setIsRunning] = useState(false);
   const [executionId, setExecutionId] = useState<string | null>(null);
   const socketRef = useRef<Socket | null>(null);
 
   useEffect(() => {
-    // Initialize socket connection
     const socket = io({
       path: '/api/socket',
       autoConnect: false,
     });
-    
-    socketRef.current = socket;
 
-    socket.on('connect', () => {
-      console.log('Socket connected');
-    });
+    socketRef.current = socket;
 
     socket.on('step_started', (data) => {
       addLog('info', `Step started: ${data.stepName}`, data);
@@ -92,8 +88,9 @@ export function TestPanel({ workflowId, onRunTest }: TestPanelProps) {
     try {
       setLogs([]);
       setIsRunning(true);
+
       const inputJson = JSON.parse(input);
-      
+
       const id = await onRunTest(inputJson);
       if (id) {
         setExecutionId(id);
@@ -101,65 +98,77 @@ export function TestPanel({ workflowId, onRunTest }: TestPanelProps) {
       } else {
         setIsRunning(false);
       }
-    } catch (e) {
+    } catch {
       addLog('error', 'Invalid JSON input');
       setIsRunning(false);
     }
   };
 
   return (
-    <Card className="h-full border-l rounded-none border-r-0 border-t-0 border-b-0 w-80 flex flex-col">
-      <CardHeader className="py-4 border-b">
-        <CardTitle className="text-lg">Test Workflow</CardTitle>
-      </CardHeader>
-      <CardContent className="flex-1 flex flex-col p-4 gap-4 overflow-hidden">
+    <div className="flex h-full flex-col">
+      <div className="border-b bg-white p-4">
+        <h3 className="text-base font-semibold text-slate-900">Test workflow</h3>
+        <p className="mt-1 text-xs text-slate-500">
+          Run the workflow with custom JSON and inspect execution logs.
+        </p>
+      </div>
+
+      <div className="flex flex-1 flex-col gap-4 overflow-hidden p-4">
         <div className="space-y-2">
-          <label className="text-sm font-medium">Input JSON</label>
+          <label className="text-sm font-medium text-slate-900">Input JSON</label>
           <Textarea
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            className="font-mono text-xs h-32"
+            className="h-32 font-mono text-xs"
           />
         </div>
-        
+
         <Button onClick={handleRun} disabled={isRunning}>
-          {isRunning ? 'Running...' : 'Run Test'}
+          {isRunning && <Spinner className="h-4 w-4" />}
+          Run test
         </Button>
 
-        <div className="flex-1 border rounded-md overflow-hidden flex flex-col">
-          <div className="bg-slate-100 px-3 py-2 text-xs font-semibold border-b">
-            Execution Logs
+        <div className="flex flex-1 flex-col overflow-hidden rounded-lg border border-slate-200 bg-white">
+          <div className="border-b bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-700">
+            Execution logs
           </div>
-          <div className="flex-1 overflow-y-auto p-2 space-y-2 bg-slate-50">
-            {logs.length === 0 && (
-              <div className="text-xs text-slate-400 text-center mt-4">
-                Run the workflow to see logs
+          <div className="flex-1 overflow-y-auto p-3">
+            {logs.length === 0 ? (
+              <div className="mt-4 text-center text-xs text-slate-400">
+                Run the workflow to see logs.
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {logs.map((log, i) => (
+                  <div key={i} className="text-xs">
+                    <div className="flex items-start gap-2">
+                      <span className="shrink-0 font-mono text-[10px] text-slate-400">
+                        {log.timestamp}
+                      </span>
+                      <span
+                        className={
+                          log.type === 'error'
+                            ? 'font-semibold text-red-600'
+                            : log.type === 'success'
+                              ? 'font-semibold text-emerald-600'
+                              : 'text-slate-700'
+                        }
+                      >
+                        {log.message}
+                      </span>
+                    </div>
+                    {log.details && (
+                      <pre className="mt-2 overflow-x-auto rounded-md border border-slate-200 bg-slate-50 p-2 font-mono text-[10px] text-slate-600">
+                        {JSON.stringify(log.details, null, 2)}
+                      </pre>
+                    )}
+                  </div>
+                ))}
               </div>
             )}
-            {logs.map((log, i) => (
-              <div key={i} className="text-xs">
-                <div className="flex items-center gap-2">
-                  <span className="text-slate-400 font-mono text-[10px]">
-                    {log.timestamp}
-                  </span>
-                  <span className={
-                    log.type === 'error' ? 'text-red-600 font-semibold' :
-                    log.type === 'success' ? 'text-green-600 font-semibold' :
-                    'text-slate-700'
-                  }>
-                    {log.message}
-                  </span>
-                </div>
-                {log.details && (
-                  <pre className="mt-1 ml-14 text-[10px] bg-white p-1 rounded border overflow-x-auto text-slate-500">
-                    {JSON.stringify(log.details, null, 2)}
-                  </pre>
-                )}
-              </div>
-            ))}
           </div>
         </div>
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   );
 }
