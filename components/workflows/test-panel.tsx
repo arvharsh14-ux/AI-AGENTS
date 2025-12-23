@@ -20,9 +20,9 @@ interface LogEntry {
 }
 
 export function TestPanel({ onRunTest }: TestPanelProps) {
-  const [input, setInput] = useState('{
+  const [input, setInput] = useState(`{
   "test": true
-}');
+}`);
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [isRunning, setIsRunning] = useState(false);
   const [executionId, setExecutionId] = useState<string | null>(null);
