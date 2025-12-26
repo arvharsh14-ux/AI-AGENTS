@@ -1,4 +1,10 @@
-import { NextResponse, type NextResponseInit } from 'next/server';
+import { NextResponse } from 'next/server';
+
+type ResponseInit = {
+  status?: number;
+  statusText?: string;
+  headers?: HeadersInit;
+};
 
 import { logger } from '@/lib/logger';
 
@@ -22,7 +28,7 @@ export class ApiError extends Error {
   }
 }
 
-export function jsonOk<T>(data: T, init?: NextResponseInit) {
+export function jsonOk<T>(data: T, init?: ResponseInit) {
   return NextResponse.json(data, init);
 }
 
@@ -30,7 +36,7 @@ export function jsonError(
   message: string,
   status = 500,
   code: ApiErrorCode = 'INTERNAL_ERROR',
-  init?: NextResponseInit,
+  init?: ResponseInit,
 ) {
   return NextResponse.json({ error: message, code }, { status, ...init });
 }
@@ -43,7 +49,7 @@ export async function readJsonBody<T = any>(request: Request): Promise<T> {
   }
 }
 
-export function handleApiError(error: unknown, context: string, init?: NextResponseInit) {
+export function handleApiError(error: unknown, context: string, init?: ResponseInit) {
   if (error instanceof ApiError) {
     logger.warn(`[API] ${context}: ${error.message}`, {
       status: error.status,
